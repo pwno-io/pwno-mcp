@@ -152,13 +152,15 @@ class ContextManager:
         if any(command.startswith(cmd) for cmd in skip_commands):
             return
             
-        # For commands that start execution, wait a bit for inferior to stop
+        # For execution commands, we can't reliably detect when inferior stops
+        # The user will need to manually refresh context if needed
         execution_commands = ["run", "continue", "c", "r"]
         if any(command.startswith(cmd) for cmd in execution_commands):
-            # Wait a bit to see if inferior stops (e.g., at a breakpoint)
-            await asyncio.sleep(0.3)
+            # Don't update context for execution commands
+            # The inferior might still be running
+            return
             
-        # Update contexts asynchronously
+        # Update contexts for other commands
         await self.update_contexts()
         
     def get_context_type(self, token: Optional[ResponseToken]) -> Optional[str]:

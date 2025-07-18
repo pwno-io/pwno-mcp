@@ -28,11 +28,6 @@ async def initialize_debugger() -> str:
 
 async def main():
     """Main entry point"""
-    # Initialize GDB controller
-    if not gdb_controller.initialize():
-        logger.error("Failed to initialize GDB controller")
-        return
-        
     logger.info("PwnoMCP server starting...")
     
     try:
@@ -45,5 +40,4 @@ async def main():
         gdb_controller.shutdown()
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# Entry point is in __main__.py
