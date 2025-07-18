@@ -3,7 +3,6 @@ GDB Controller wrapper for PwnoMCP
 Handles pygdbmi integration with proper state management and response handling
 """
 
-import asyncio
 import logging
 from enum import Enum, auto
 from pathlib import Path
@@ -95,16 +94,6 @@ class GDBController:
         self._stderr_buffer: List[str] = []
         self._console_buffer: List[str] = []
         self._max_buffer_size = 10000  # Max lines to keep in buffers
-        
-        # WebSocket update queue for thread-safe updates
-        self._ws_update_queue: queue.Queue = queue.Queue()
-        
-        # Main event loop reference (set by server)
-        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
-        
-    def set_event_loop(self, loop: asyncio.AbstractEventLoop):
-        """Set the main event loop for WebSocket updates"""
-        self._main_loop = loop
         
     def initialize(self) -> bool:
         """Initialize GDB controller and start worker threads"""
@@ -236,34 +225,24 @@ class GDBController:
                 elif parsed.type == "output":
                     # Inferior stdout
                     self._add_to_buffer(self._stdout_buffer, parsed.payload)
-                    self._emit_ws_update("stdout", parsed.payload, token)
                 elif parsed.type == "log":
                     # GDB log/error output
                     self._add_to_buffer(self._stderr_buffer, parsed.payload)
-                    self._emit_ws_update("stderr", parsed.payload, token)
                     
             # Handle result type (command completion) - emit buffered content
             if parsed.type == "result" and token and token in self._response_buffer:
-                # Get the appropriate update type based on token
-                from pwnomcp.context import context_manager
-                update_type = context_manager.get_update_type(token)
-                
-                # Combine buffered output and emit
+                # Combine buffered output
                 combined_output = "".join(self._response_buffer[token])
                 self._response_buffer.pop(token)
                 
                 # Store in context cache if it's a context command
                 try:
                     from pwnomcp.context import context_manager
-                    if token in [ResponseToken.CONTEXT_REGS, ResponseToken.CONTEXT_STACK,
-                                ResponseToken.CONTEXT_CODE, ResponseToken.CONTEXT_DISASM,
-                                ResponseToken.CONTEXT_BACKTRACE, ResponseToken.HEAP_CHUNKS]:
-                        context_manager.store_context(update_type.value, combined_output)
+                    context_type = context_manager.get_context_type(token)
+                    if context_type:
+                        context_manager.store_context(context_type, combined_output)
                 except:
                     pass
-                
-                # Emit via WebSocket using token-determined destination
-                self._emit_ws_update(update_type.value, combined_output, token)
             
             # Queue response for processing
             self.response_queue.put(parsed)
@@ -278,7 +257,6 @@ class GDBController:
             
     def _update_inferior_state(self, response: GDBResponse):
         """Update inferior state based on GDB notifications"""
-        old_state = self.inferior_state
         if response.payload:
             if "stopped" in str(response.payload):
                 self.inferior_state = InferiorState.STOPPED
@@ -286,13 +264,6 @@ class GDBController:
                 self.inferior_state = InferiorState.RUNNING
             elif "exited" in str(response.payload):
                 self.inferior_state = InferiorState.EXITED
-                
-        # Emit state change via WebSocket
-        if old_state != self.inferior_state:
-            self._emit_ws_update("state", {
-                "old_state": old_state.name,
-                "new_state": self.inferior_state.name
-            })
                 
     def _send_command(self, token: ResponseToken, command: str):
         """Queue command for sending to GDB"""
@@ -400,94 +371,6 @@ class GDBController:
         self._stderr_buffer.clear()
         self._console_buffer.clear()
         
-    def _emit_ws_update(self, update_type: str, data: Any, token: Optional[ResponseToken] = None):
-        """Emit update via WebSocket (thread-safe)"""
-        if not self._main_loop:
-            # No event loop set, queue for later
-            self._ws_update_queue.put((update_type, data, token))
-            return
-            
-        try:
-            # Import here to avoid circular dependency
-            from pwnomcp.websocket import ws_manager, WSUpdate, UpdateType
-            
-            # Map string types to enum
-            type_map = {
-                "console": UpdateType.CONSOLE,
-                "stdout": UpdateType.STDOUT,
-                "stderr": UpdateType.STDERR,
-                "state": UpdateType.STATE,
-                "context": UpdateType.CONTEXT,
-                "breakpoint": UpdateType.BREAKPOINT,
-                "heap": UpdateType.HEAP,
-                "registers": UpdateType.REGISTERS,
-                "stack": UpdateType.STACK,
-                "memory": UpdateType.MEMORY,
-                "error": UpdateType.ERROR
-            }
-            
-            update = WSUpdate(
-                type=type_map.get(update_type, UpdateType.CONSOLE),
-                data=data,
-                token=token.value if token else None
-            )
-            
-            # Schedule the coroutine in the main event loop
-            asyncio.run_coroutine_threadsafe(
-                ws_manager.queue_update(update),
-                self._main_loop
-            )
-            # Don't wait for result - fire and forget
-            
-        except Exception as e:
-            # Don't let WebSocket errors affect GDB operation
-            logger.debug(f"WebSocket update error: {e}")
-            
-    def emit_context_update(self, context_type: str, data: str):
-        """Emit context update via WebSocket"""
-        self._emit_ws_update(context_type, data)
-        
-    async def process_ws_updates(self):
-        """Process WebSocket updates from the queue (call from main thread)"""
-        # Process any updates that were queued before the event loop was set
-        while self.running:
-            try:
-                # Check for queued updates with short timeout
-                update_data = self._ws_update_queue.get(timeout=0.1)
-                update_type, data, token = update_data
-                
-                # Import here to avoid circular dependency
-                from pwnomcp.websocket import ws_manager, WSUpdate, UpdateType
-                
-                # Map string types to enum
-                type_map = {
-                    "console": UpdateType.CONSOLE,
-                    "stdout": UpdateType.STDOUT,
-                    "stderr": UpdateType.STDERR,
-                    "state": UpdateType.STATE,
-                    "context": UpdateType.CONTEXT,
-                    "breakpoint": UpdateType.BREAKPOINT,
-                    "heap": UpdateType.HEAP,
-                    "registers": UpdateType.REGISTERS,
-                    "stack": UpdateType.STACK,
-                    "memory": UpdateType.MEMORY,
-                    "error": UpdateType.ERROR
-                }
-                
-                update = WSUpdate(
-                    type=type_map.get(update_type, UpdateType.CONSOLE),
-                    data=data,
-                    token=token.value if token else None
-                )
-                
-                # Queue update for WebSocket
-                await ws_manager.queue_update(update)
-                
-            except queue.Empty:
-                await asyncio.sleep(0.01)
-            except Exception as e:
-                logger.debug(f"Error processing WebSocket update: {e}")
-                await asyncio.sleep(0.1)
 
 
 # Global GDB controller instance

@@ -5,13 +5,11 @@ Combines context caching, automatic updates, and token-based routing
 
 import asyncio
 import logging
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
 
 from pwnomcp.gdb_controller import gdb_controller, ResponseToken, InferiorState
-from pwnomcp.websocket import ws_manager, WSUpdate, UpdateType
 
 logger = logging.getLogger(__name__)
 
@@ -48,47 +46,23 @@ class ContextCache:
 class TokenRouter:
     """Routes GDB responses based on pre-assigned tokens (pwndbg-gui pattern)"""
     
-    # Map tokens to WebSocket update types
-    TOKEN_TO_UPDATE_TYPE: Dict[ResponseToken, UpdateType] = {
-        # Context tokens → specific components
-        ResponseToken.CONTEXT_FULL: UpdateType.CONSOLE,
-        ResponseToken.CONTEXT_REGS: UpdateType.REGISTERS,
-        ResponseToken.CONTEXT_STACK: UpdateType.STACK,
-        ResponseToken.CONTEXT_CODE: UpdateType.CODE,
-        ResponseToken.CONTEXT_DISASM: UpdateType.CONTEXT,
-        ResponseToken.CONTEXT_BACKTRACE: UpdateType.CONTEXT,
-        
-        # Heap tokens → heap component
-        ResponseToken.HEAP_CHUNKS: UpdateType.HEAP,
-        ResponseToken.HEAP_BINS: UpdateType.HEAP,
-        ResponseToken.HEAP_TCACHE: UpdateType.HEAP,
-        
-        # Memory tokens → memory component
-        ResponseToken.MEMORY_DUMP: UpdateType.MEMORY,
-        ResponseToken.VMMAP: UpdateType.MEMORY,
-        
-        # Info tokens
-        ResponseToken.INFO_BREAKPOINTS: UpdateType.BREAKPOINT,
-        ResponseToken.INFO_REGISTERS: UpdateType.REGISTERS,
-        
-        # General tokens
-        ResponseToken.USER: UpdateType.CONSOLE,
-        ResponseToken.EXECUTE: UpdateType.CONSOLE,
-        
-        # Execution tokens → console
-        ResponseToken.RUN: UpdateType.CONSOLE,
-        ResponseToken.CONTINUE: UpdateType.CONSOLE,
-        ResponseToken.STEP: UpdateType.CONSOLE,
-        ResponseToken.NEXT: UpdateType.CONSOLE,
-        ResponseToken.STEPI: UpdateType.CONSOLE,
-        ResponseToken.NEXTI: UpdateType.CONSOLE,
+    # Map tokens to context types for caching
+    TOKEN_TO_CONTEXT: Dict[ResponseToken, str] = {
+        ResponseToken.CONTEXT_REGS: "registers",
+        ResponseToken.CONTEXT_STACK: "stack",
+        ResponseToken.CONTEXT_CODE: "code",
+        ResponseToken.CONTEXT_DISASM: "disasm",
+        ResponseToken.CONTEXT_BACKTRACE: "backtrace",
+        ResponseToken.HEAP_CHUNKS: "heap",
+        ResponseToken.HEAP_BINS: "heap",
+        ResponseToken.HEAP_TCACHE: "heap",
     }
     
-    def get_update_type(self, token: Optional[ResponseToken]) -> UpdateType:
-        """Get WebSocket update type for a token"""
+    def get_context_type(self, token: Optional[ResponseToken]) -> Optional[str]:
+        """Get context type for caching based on token"""
         if token is None:
-            return UpdateType.CONSOLE
-        return self.TOKEN_TO_UPDATE_TYPE.get(token, UpdateType.CONSOLE)
+            return None
+        return self.TOKEN_TO_CONTEXT.get(token)
 
 
 class ContextManager:
@@ -187,9 +161,9 @@ class ContextManager:
         # Update contexts asynchronously
         await self.update_contexts()
         
-    def get_update_type(self, token: Optional[ResponseToken]) -> UpdateType:
-        """Get WebSocket update type for token (delegates to router)"""
-        return self.router.get_update_type(token)
+    def get_context_type(self, token: Optional[ResponseToken]) -> Optional[str]:
+        """Get context type for token (delegates to router)"""
+        return self.router.get_context_type(token)
 
 
 # Global context manager instance
