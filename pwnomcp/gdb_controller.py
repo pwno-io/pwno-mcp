@@ -123,11 +123,17 @@ class GDBController:
     def shutdown(self):
         """Shutdown GDB controller and worker threads"""
         self.running = False
+        
+        # Give threads a moment to finish
+        import time
+        time.sleep(0.2)
+        
         if self.controller:
             try:
                 self.controller.exit()
             except:
                 pass
+            self.controller = None
                 
     def _load_gdbinit(self):
         """Load .gdbinit file manually (GDB MI doesn't load it automatically)"""
@@ -140,6 +146,9 @@ class GDBController:
         """Continuously read responses from GDB"""
         while self.running:
             try:
+                if not self.controller:
+                    break
+                    
                 response = self.controller.get_gdb_response(
                     timeout_sec=0.1,
                     raise_error_on_timeout=False
@@ -148,12 +157,20 @@ class GDBController:
                     for resp in response:
                         self._handle_response(resp)
             except Exception as e:
-                logger.error(f"Error in reader loop: {e}")
+                if "closed file" in str(e).lower():
+                    logger.info("GDB process closed, stopping reader")
+                    self.running = False
+                    break
+                else:
+                    logger.error(f"Error in reader loop: {e}")
                 
     def _writer_loop(self):
         """Process command queue and send to GDB"""
         while self.running:
             try:
+                if not self.controller:
+                    break
+                    
                 token, command = self.command_queue.get(timeout=0.1)
                 if token and command:
                     # Prefix command with token for tracking
@@ -163,7 +180,12 @@ class GDBController:
             except queue.Empty:
                 continue
             except Exception as e:
-                logger.error(f"Error in writer loop: {e}")
+                if "closed file" in str(e).lower():
+                    logger.info("GDB process closed, stopping writer")
+                    self.running = False
+                    break
+                else:
+                    logger.error(f"Error in writer loop: {e}")
                 
     def _handle_response(self, response: Dict[str, Any]):
         """Parse and handle GDB response"""
