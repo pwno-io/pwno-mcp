@@ -28,6 +28,9 @@ async def initialize_debugger() -> str:
 
 async def main():
     """Main entry point"""
+    # Set the event loop for GDB controller
+    gdb_controller.set_event_loop(asyncio.get_running_loop())
+    
     # Initialize GDB controller
     if not gdb_controller.initialize():
         logger.error("Failed to initialize GDB controller")
@@ -39,7 +42,7 @@ async def main():
     from pwnomcp.websocket import ws_manager
     await ws_manager.start(host="0.0.0.0", port=8765)
     
-    # Start processing WebSocket updates from GDB threads
+    # Start processing queued WebSocket updates
     asyncio.create_task(gdb_controller.process_ws_updates())
     
     try:

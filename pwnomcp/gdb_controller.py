@@ -99,6 +99,13 @@ class GDBController:
         # WebSocket update queue for thread-safe updates
         self._ws_update_queue: queue.Queue = queue.Queue()
         
+        # Main event loop reference (set by server)
+        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
+        
+    def set_event_loop(self, loop: asyncio.AbstractEventLoop):
+        """Set the main event loop for WebSocket updates"""
+        self._main_loop = loop
+        
     def initialize(self) -> bool:
         """Initialize GDB controller and start worker threads"""
         try:
@@ -395,9 +402,43 @@ class GDBController:
         
     def _emit_ws_update(self, update_type: str, data: Any, token: Optional[ResponseToken] = None):
         """Emit update via WebSocket (thread-safe)"""
-        try:
-            # Queue the update for processing in the main thread
+        if not self._main_loop:
+            # No event loop set, queue for later
             self._ws_update_queue.put((update_type, data, token))
+            return
+            
+        try:
+            # Import here to avoid circular dependency
+            from pwnomcp.websocket import ws_manager, WSUpdate, UpdateType
+            
+            # Map string types to enum
+            type_map = {
+                "console": UpdateType.CONSOLE,
+                "stdout": UpdateType.STDOUT,
+                "stderr": UpdateType.STDERR,
+                "state": UpdateType.STATE,
+                "context": UpdateType.CONTEXT,
+                "breakpoint": UpdateType.BREAKPOINT,
+                "heap": UpdateType.HEAP,
+                "registers": UpdateType.REGISTERS,
+                "stack": UpdateType.STACK,
+                "memory": UpdateType.MEMORY,
+                "error": UpdateType.ERROR
+            }
+            
+            update = WSUpdate(
+                type=type_map.get(update_type, UpdateType.CONSOLE),
+                data=data,
+                token=token.value if token else None
+            )
+            
+            # Schedule the coroutine in the main event loop
+            asyncio.run_coroutine_threadsafe(
+                ws_manager.queue_update(update),
+                self._main_loop
+            )
+            # Don't wait for result - fire and forget
+            
         except Exception as e:
             # Don't let WebSocket errors affect GDB operation
             logger.debug(f"WebSocket update error: {e}")
@@ -408,9 +449,10 @@ class GDBController:
         
     async def process_ws_updates(self):
         """Process WebSocket updates from the queue (call from main thread)"""
-        while True:
+        # Process any updates that were queued before the event loop was set
+        while self.running:
             try:
-                # Get update from queue with timeout
+                # Check for queued updates with short timeout
                 update_data = self._ws_update_queue.get(timeout=0.1)
                 update_type, data, token = update_data
                 
