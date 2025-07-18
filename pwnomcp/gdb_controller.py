@@ -96,6 +96,9 @@ class GDBController:
         self._console_buffer: List[str] = []
         self._max_buffer_size = 10000  # Max lines to keep in buffers
         
+        # WebSocket update queue for thread-safe updates
+        self._ws_update_queue: queue.Queue = queue.Queue()
+        
     def initialize(self) -> bool:
         """Initialize GDB controller and start worker threads"""
         try:
@@ -391,35 +394,10 @@ class GDBController:
         self._console_buffer.clear()
         
     def _emit_ws_update(self, update_type: str, data: Any, token: Optional[ResponseToken] = None):
-        """Emit update via WebSocket (non-blocking)"""
+        """Emit update via WebSocket (thread-safe)"""
         try:
-            # Import here to avoid circular dependency
-            from pwnomcp.websocket import ws_manager, WSUpdate, UpdateType
-            
-            # Map string types to enum
-            type_map = {
-                "console": UpdateType.CONSOLE,
-                "stdout": UpdateType.STDOUT,
-                "stderr": UpdateType.STDERR,
-                "state": UpdateType.STATE,
-                "context": UpdateType.CONTEXT,
-                "breakpoint": UpdateType.BREAKPOINT,
-                "heap": UpdateType.HEAP,
-                "registers": UpdateType.REGISTERS,
-                "stack": UpdateType.STACK,
-                "memory": UpdateType.MEMORY,
-                "error": UpdateType.ERROR
-            }
-            
-            update = WSUpdate(
-                type=type_map.get(update_type, UpdateType.CONSOLE),
-                data=data,
-                token=token.value if token else None
-            )
-            
-            # Queue update asynchronously
-            asyncio.create_task(ws_manager.queue_update(update))
-            
+            # Queue the update for processing in the main thread
+            self._ws_update_queue.put((update_type, data, token))
         except Exception as e:
             # Don't let WebSocket errors affect GDB operation
             logger.debug(f"WebSocket update error: {e}")
@@ -427,6 +405,47 @@ class GDBController:
     def emit_context_update(self, context_type: str, data: str):
         """Emit context update via WebSocket"""
         self._emit_ws_update(context_type, data)
+        
+    async def process_ws_updates(self):
+        """Process WebSocket updates from the queue (call from main thread)"""
+        while True:
+            try:
+                # Get update from queue with timeout
+                update_data = self._ws_update_queue.get(timeout=0.1)
+                update_type, data, token = update_data
+                
+                # Import here to avoid circular dependency
+                from pwnomcp.websocket import ws_manager, WSUpdate, UpdateType
+                
+                # Map string types to enum
+                type_map = {
+                    "console": UpdateType.CONSOLE,
+                    "stdout": UpdateType.STDOUT,
+                    "stderr": UpdateType.STDERR,
+                    "state": UpdateType.STATE,
+                    "context": UpdateType.CONTEXT,
+                    "breakpoint": UpdateType.BREAKPOINT,
+                    "heap": UpdateType.HEAP,
+                    "registers": UpdateType.REGISTERS,
+                    "stack": UpdateType.STACK,
+                    "memory": UpdateType.MEMORY,
+                    "error": UpdateType.ERROR
+                }
+                
+                update = WSUpdate(
+                    type=type_map.get(update_type, UpdateType.CONSOLE),
+                    data=data,
+                    token=token.value if token else None
+                )
+                
+                # Queue update for WebSocket
+                await ws_manager.queue_update(update)
+                
+            except queue.Empty:
+                await asyncio.sleep(0.01)
+            except Exception as e:
+                logger.debug(f"Error processing WebSocket update: {e}")
+                await asyncio.sleep(0.1)
 
 
 # Global GDB controller instance
