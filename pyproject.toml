@@ -1,0 +1,13 @@
+[project]
+name = "pwno-mcp"
+version = "0.1.0"
+description = "MCP server for Pwno, the Autonomous low-level security research agent"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp>=1.0.0",
+    "pygdbmi>=0.11.0.0",
+    "typing-extensions>=4.0.0",
+    "websockets>=12.0",
+    "aiohttp>=3.9.0",
+]

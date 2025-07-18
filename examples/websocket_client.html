@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PwnoMCP WebSocket Client</title>
+    <style>
+        body {
+            font-family: monospace;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .connected {
+            background-color: #2d7a2d;
+        }
+        
+        .disconnected {
+            background-color: #7a2d2d;
+        }
+        
+        .contexts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .context-panel {
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .context-header {
+            background-color: #2d2d30;
+            padding: 10px;
+            font-weight: bold;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        .context-content {
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+        
+        .console-panel {
+            grid-column: 1 / -1;
+            height: 200px;
+        }
+        
+        .console-panel .context-content {
+            height: 150px;
+        }
+        
+        .state-info {
+            background-color: #2d2d30;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        /* Syntax highlighting */
+        .register { color: #9cdcfe; }
+        .address { color: #ce9178; }
+        .instruction { color: #c586c0; }
+        .symbol { color: #dcdcaa; }
+        .number { color: #b5cea8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PwnoMCP WebSocket Client</h1>
+        
+        <div id="status" class="status disconnected">
+            Disconnected
+        </div>
+        
+        <div id="state-info" class="state-info">
+            <strong>Inferior State:</strong> <span id="inferior-state">Unknown</span><br>
+            <strong>GDB Initialized:</strong> <span id="gdb-initialized">False</span>
+        </div>
+        
+        <div class="contexts">
+            <div class="context-panel">
+                <div class="context-header">Registers</div>
+                <div class="context-content" id="registers"></div>
+            </div>
+            
+            <div class="context-panel">
+                <div class="context-header">Stack</div>
+                <div class="context-content" id="stack"></div>
+            </div>
+            
+            <div class="context-panel">
+                <div class="context-header">Code</div>
+                <div class="context-content" id="code"></div>
+            </div>
+            
+            <div class="context-panel">
+                <div class="context-header">Disassembly</div>
+                <div class="context-content" id="disasm"></div>
+            </div>
+            
+            <div class="context-panel">
+                <div class="context-header">Heap</div>
+                <div class="context-content" id="heap"></div>
+            </div>
+            
+            <div class="context-panel">
+                <div class="context-header">Memory</div>
+                <div class="context-content" id="memory"></div>
+            </div>
+            
+            <div class="context-panel console-panel">
+                <div class="context-header">Console Output</div>
+                <div class="context-content" id="console"></div>
+            </div>
+            
+            <div class="context-panel console-panel">
+                <div class="context-header">Stdout</div>
+                <div class="context-content" id="stdout"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const WS_URL = 'ws://localhost:8765';
+        let ws = null;
+        let reconnectInterval = null;
+        
+        const panels = {
+            registers: document.getElementById('registers'),
+            stack: document.getElementById('stack'),
+            code: document.getElementById('code'),
+            disasm: document.getElementById('disasm'),
+            heap: document.getElementById('heap'),
+            memory: document.getElementById('memory'),
+            console: document.getElementById('console'),
+            stdout: document.getElementById('stdout')
+        };
+        
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+            }
+        }
+        
+        function highlightSyntax(text, type) {
+            // Simple syntax highlighting
+            text = text.replace(/0x[0-9a-fA-F]+/g, '<span class="address">$&</span>');
+            text = text.replace(/\$\w+/g, '<span class="register">$&</span>');
+            text = text.replace(/\b\d+\b/g, '<span class="number">$&</span>');
+            
+            if (type === 'code' || type === 'disasm') {
+                // Highlight assembly instructions
+                const instructions = ['mov', 'push', 'pop', 'call', 'ret', 'jmp', 'je', 'jne', 
+                                     'lea', 'add', 'sub', 'xor', 'and', 'or', 'cmp', 'test'];
+                const regex = new RegExp('\\b(' + instructions.join('|') + ')\\b', 'gi');
+                text = text.replace(regex, '<span class="instruction">$1</span>');
+            }
+            
+            return text;
+        }
+        
+        function appendToPanel(panelId, content, highlight = true) {
+            const panel = panels[panelId];
+            if (!panel) return;
+            
+            const div = document.createElement('div');
+            div.innerHTML = highlight ? highlightSyntax(content, panelId) : content;
+            panel.appendChild(div);
+            
+            // Auto-scroll to bottom
+            panel.scrollTop = panel.scrollHeight;
+            
+            // Limit history
+            while (panel.children.length > 100) {
+                panel.removeChild(panel.firstChild);
+            }
+        }
+        
+        function clearPanel(panelId) {
+            const panel = panels[panelId];
+            if (panel) {
+                panel.innerHTML = '';
+            }
+        }
+        
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'state':
+                    document.getElementById('inferior-state').textContent = 
+                        data.data.new_state || data.data.inferior_state || 'Unknown';
+                    if (data.data.gdb_initialized !== undefined) {
+                        document.getElementById('gdb-initialized').textContent = 
+                            data.data.gdb_initialized ? 'Yes' : 'No';
+                    }
+                    break;
+                    
+                case 'registers':
+                    clearPanel('registers');
+                    appendToPanel('registers', data.data);
+                    break;
+                    
+                case 'stack':
+                    clearPanel('stack');
+                    appendToPanel('stack', data.data);
+                    break;
+                    
+                case 'code':
+                    clearPanel('code');
+                    appendToPanel('code', data.data);
+                    break;
+                    
+                case 'disasm':
+                    clearPanel('disasm');
+                    appendToPanel('disasm', data.data);
+                    break;
+                    
+                case 'heap':
+                    clearPanel('heap');
+                    appendToPanel('heap', data.data);
+                    break;
+                    
+                case 'memory':
+                    appendToPanel('memory', data.data);
+                    break;
+                    
+                case 'console':
+                case 'general':
+                    appendToPanel('console', data.data);
+                    break;
+                    
+                case 'stdout':
+                    appendToPanel('stdout', data.data, false);
+                    break;
+                    
+                case 'stderr':
+                    appendToPanel('console', `[ERROR] ${data.data}`);
+                    break;
+            }
+        }
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                return;
+            }
+            
+            ws = new WebSocket(WS_URL);
+            
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                updateStatus(true);
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleMessage(data);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                updateStatus(false);
+                
+                // Attempt to reconnect
+                if (!reconnectInterval) {
+                    reconnectInterval = setInterval(() => {
+                        console.log('Attempting to reconnect...');
+                        connect();
+                    }, 3000);
+                }
+            };
+        }
+        
+        // Initial connection
+        connect();
+    </script>
+</body>
+</html>
