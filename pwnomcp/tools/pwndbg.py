@@ -3,10 +3,10 @@ MCP tools for pwndbg integration
 Provides execution and control flow tools for debugging
 """
 
-import asyncio
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, List
 from pathlib import Path
+import time
 
 from pwnomcp.mcp_server import mcp
 from pwnomcp.gdb_controller import gdb_controller, ResponseToken, InferiorState
@@ -36,7 +36,7 @@ async def pwnodbg_execute(command: str) -> str:
     
     # Following pwndbg-gui: update contexts after user command
     from pwnomcp.context import context_manager
-    await context_manager.on_command_executed(command)
+    context_manager.on_command_executed(command)
     
     return result if result else f"Command executed: {command} (no output)"
 
@@ -132,7 +132,7 @@ async def pwnodbg_run(until: Optional[str] = None) -> str:
     
     # Update contexts after run (if it stops at a breakpoint)
     from pwnomcp.context import context_manager
-    await context_manager.on_command_executed(command)
+    context_manager.on_command_executed(command)
     
     return f"Executing: {command}"
 
@@ -149,7 +149,7 @@ async def pwnodbg_continue() -> str:
     
     # Update contexts after continue (if it stops at a breakpoint)
     from pwnomcp.context import context_manager
-    await context_manager.on_command_executed("continue")
+    context_manager.on_command_executed("continue")
     
     return "Continuing execution..."
 
@@ -177,7 +177,7 @@ async def pwnodbg_step(type: str = "step", count: int = 1) -> str:
     
     # Update contexts after step command
     from pwnomcp.context import context_manager
-    await context_manager.on_command_executed(command)
+    context_manager.on_command_executed(command)
     
     return f"Executing: {command} (context will be updated)"
 
@@ -209,9 +209,10 @@ async def pwnodbg_context(sections: Optional[List[str]] = None, refresh: bool = 
     
     # Force refresh if requested
     if refresh:
-        await context_manager.update_contexts(force=True)
+        context_manager.update_contexts(force=True)
         # Wait a bit for context to be populated
-        await asyncio.sleep(0.5)
+        import time
+        time.sleep(0.5)
     
     # Get cached context
     cached = context_manager.get_cached_context()
@@ -219,8 +220,9 @@ async def pwnodbg_context(sections: Optional[List[str]] = None, refresh: bool = 
     # Check if we have any cached data
     if not cached.get("timestamp"):
         # No cache, trigger update
-        await context_manager.update_contexts()
-        await asyncio.sleep(0.5)
+        context_manager.update_contexts()
+        import time
+        time.sleep(0.5)
         cached = context_manager.get_cached_context()
         
         if not cached.get("timestamp"):

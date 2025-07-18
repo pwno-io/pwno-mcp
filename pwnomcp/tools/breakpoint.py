@@ -57,7 +57,7 @@ async def pwnodbg_breakpoint(
                 
         # Update contexts after state change
         from pwnomcp.context import context_manager
-        await context_manager.on_command_executed(cmd)
+        context_manager.on_command_executed(cmd)
         
         return result if result else f"Breakpoint set at {location}"
                 
@@ -76,7 +76,7 @@ async def pwnodbg_breakpoint(
         
         # Update contexts after state change
         from pwnomcp.context import context_manager
-        await context_manager.on_command_executed(cmd)
+        context_manager.on_command_executed(cmd)
         
         return result if result else f"Breakpoint(s) deleted"
         
@@ -89,7 +89,7 @@ async def pwnodbg_breakpoint(
         
         # Update contexts after state change
         from pwnomcp.context import context_manager
-        await context_manager.on_command_executed(cmd)
+        context_manager.on_command_executed(cmd)
         
         return result if result else f"Breakpoint {number} {action}d"
 
@@ -135,7 +135,7 @@ async def pwnodbg_watchpoint(
     
     # Update contexts after state change
     from pwnomcp.context import context_manager
-    await context_manager.on_command_executed(cmd)
+    context_manager.on_command_executed(cmd)
     
     return result if result else f"Command executed: {cmd}"
 
@@ -173,6 +173,6 @@ async def pwnodbg_catch(event: str, name: Optional[str] = None) -> str:
     
     # Update contexts after state change
     from pwnomcp.context import context_manager
-    await context_manager.on_command_executed(cmd)
+    context_manager.on_command_executed(cmd)
     
     return result if result else f"Command executed: {cmd}"

@@ -1,16 +1,16 @@
 """
 GDB Controller wrapper for PwnoMCP
 Handles pygdbmi integration with proper state management and response handling
+Following pwndbg-gui's synchronous design pattern
 """
 
 import logging
 from enum import Enum, auto
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from pygdbmi import gdbcontroller
 import threading
-import queue
 import time
 
 logger = logging.getLogger(__name__)
@@ -73,21 +73,20 @@ class GDBResponse:
 class GDBController:
     """
     Thread-safe wrapper around pygdbmi GdbController
-    Implements patterns from pwndbg-gui for robust async operation
+    Implements synchronous patterns from pwndbg-gui
     """
     
     def __init__(self):
         self.controller: Optional[gdbcontroller.GdbController] = None
         self.inferior_state = InferiorState.NONE
-        self.response_queue = queue.Queue()
-        self.command_queue = queue.Queue()
-        self.callbacks: Dict[ResponseToken, List[Callable]] = {}
         self.reader_thread: Optional[threading.Thread] = None
-        self.writer_thread: Optional[threading.Thread] = None
         self.running = False
         self._token_counter = 1000
-        self._response_buffer: Dict[ResponseToken, List[str]] = {}
         self._gdbinit_loaded = False
+        
+        # Response handling (synchronous, like pwndbg-gui)
+        self.result: List[str] = []
+        self.logs: List[str] = []
         
         # Stdio buffers
         self._stdout_buffer: List[str] = []
@@ -95,19 +94,22 @@ class GDBController:
         self._console_buffer: List[str] = []
         self._max_buffer_size = 10000  # Max lines to keep in buffers
         
+        # Token-based response buffers
+        self._response_buffers: Dict[int, List[str]] = {}
+        
+        # Thread synchronization
+        self._response_lock = threading.Lock()
+        self._command_lock = threading.Lock()
+        
     def initialize(self) -> bool:
-        """Initialize GDB controller and start worker threads"""
+        """Initialize GDB controller and start reader thread"""
         try:
             self.controller = gdbcontroller.GdbController()
             self.running = True
             
-            # Start reader thread
+            # Start reader thread (following pwndbg-gui pattern)
             self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
             self.reader_thread.start()
-            
-            # Start writer thread  
-            self.writer_thread = threading.Thread(target=self._writer_loop, daemon=True)
-            self.writer_thread.start()
             
             # Load .gdbinit if it exists
             self._load_gdbinit()
@@ -120,13 +122,12 @@ class GDBController:
             return False
             
     def shutdown(self):
-        """Shutdown GDB controller and worker threads"""
+        """Shutdown GDB controller and reader thread"""
         self.running = False
         
-        # Give threads a moment to finish
-        import time
-        time.sleep(0.2)
-        
+        if self.reader_thread:
+            self.reader_thread.join(timeout=1.0)
+            
         if self.controller:
             try:
                 self.controller.exit()
@@ -138,23 +139,25 @@ class GDBController:
         """Load .gdbinit file manually (GDB MI doesn't load it automatically)"""
         gdbinit_path = Path.home() / ".gdbinit"
         if gdbinit_path.exists():
-            self._send_command(ResponseToken.INTERNAL, f"source {gdbinit_path}")
+            self.execute("source " + str(gdbinit_path), ResponseToken.INTERNAL)
             self._gdbinit_loaded = True
             
     def _reader_loop(self):
-        """Continuously read responses from GDB"""
+        """Continuously read responses from GDB (following pwndbg-gui pattern)"""
         while self.running:
             try:
                 if not self.controller:
                     break
                     
+                # Get response with timeout (like pwndbg-gui)
                 response = self.controller.get_gdb_response(
                     timeout_sec=0.1,
                     raise_error_on_timeout=False
                 )
+                
                 if response:
-                    for resp in response:
-                        self._handle_response(resp)
+                    self._parse_response(response)
+                    
             except Exception as e:
                 if "closed file" in str(e).lower():
                     logger.info("GDB process closed, stopping reader")
@@ -162,173 +165,165 @@ class GDBController:
                     break
                 else:
                     logger.error(f"Error in reader loop: {e}")
-                
-    def _writer_loop(self):
-        """Process command queue and send to GDB"""
-        while self.running:
-            try:
-                if not self.controller:
-                    break
                     
-                token, command = self.command_queue.get(timeout=0.1)
-                if token and command:
-                    # Prefix command with token for tracking
-                    prefixed_cmd = f"{token.value}-{command}"
-                    self.controller.write(prefixed_cmd, read_response=False)
-                    logger.debug(f"Sent command: {prefixed_cmd}")
-            except queue.Empty:
-                continue
-            except Exception as e:
-                if "closed file" in str(e).lower():
-                    logger.info("GDB process closed, stopping writer")
-                    self.running = False
-                    break
-                else:
-                    logger.error(f"Error in writer loop: {e}")
+    def _parse_response(self, gdbmi_response: List[Dict[str, Any]]):
+        """Parse response from GDB MI (following pwndbg-gui logic)"""
+        for response in gdbmi_response:
+            with self._response_lock:
+                # Extract token if present
+                token = None
+                token_value = response.get("token")
+                if token_value is not None:
+                    try:
+                        token = int(token_value)
+                    except:
+                        pass
                 
-    def _handle_response(self, response: Dict[str, Any]):
-        """Parse and handle GDB response"""
-        try:
-            # Extract token if present
-            token = None
-            if "token" in response and response["token"]:
-                try:
-                    token_value = int(response["token"])
-                    token = ResponseToken(token_value)
-                except:
-                    pass
-                    
-            # Create parsed response
-            parsed = GDBResponse(
-                token=token,
-                type=response.get("type", ""),
-                message=response.get("message", ""),
-                payload=response.get("payload"),
-                raw=response
-            )
-            
-            # Update inferior state based on notifications
-            if parsed.type == "notify":
-                self._update_inferior_state(parsed)
+                # Handle different response types (following pwndbg-gui pattern)
+                resp_type = response.get("type", "")
+                payload = response.get("payload", "")
                 
-            # Buffer different types of output
-            if parsed.payload:
-                if parsed.type == "console":
-                    # GDB console output
-                    self._add_to_buffer(self._console_buffer, parsed.payload)
+                if resp_type == "console" and payload:
+                    # Console output goes to result buffer
+                    self.result.append(payload)
+                    self._add_to_buffer(self._console_buffer, payload)
                     
-                    # Follow pwndbg-gui pattern: buffer based on token
-                    if token and token not in self._response_buffer:
-                        self._response_buffer[token] = []
-                    if token:
-                        self._response_buffer[token].append(parsed.payload)
-                elif parsed.type == "output":
+                    # Buffer by token if present
+                    if token is not None:
+                        if token not in self._response_buffers:
+                            self._response_buffers[token] = []
+                        self._response_buffers[token].append(payload)
+                        
+                elif resp_type == "output":
                     # Inferior stdout
-                    self._add_to_buffer(self._stdout_buffer, parsed.payload)
-                elif parsed.type == "log":
-                    # GDB log/error output
-                    self._add_to_buffer(self._stderr_buffer, parsed.payload)
+                    self.result.append(payload)
+                    self._add_to_buffer(self._stdout_buffer, payload)
                     
-            # Handle result type (command completion) - emit buffered content
-            if parsed.type == "result" and token and token in self._response_buffer:
-                # Combine buffered output
-                combined_output = "".join(self._response_buffer[token])
-                self._response_buffer.pop(token)
+                elif resp_type == "log":
+                    # GDB logs/errors
+                    self.logs.append(payload)
+                    self._add_to_buffer(self._stderr_buffer, payload)
+                    
+                elif resp_type == "result":
+                    # Command completion - flush buffers
+                    self._handle_result(response, token)
+                    
+                elif resp_type == "notify":
+                    # State changes
+                    self._handle_notify(response)
+                    
+    def _handle_result(self, response: Dict[str, Any], token: Optional[int]):
+        """Handle result messages (command completion)"""
+        message = response.get("message", "")
+        
+        # Handle error messages
+        if message == "error" and response.get("payload"):
+            error_msg = response["payload"].get("msg", "Unknown error")
+            self.result.append(error_msg)
+            
+        # Process token-based responses
+        if token is not None and token in self._response_buffers:
+            # Get buffered output for this token
+            output = "".join(self._response_buffers[token])
+            del self._response_buffers[token]
+            
+            # Store in context cache if it's a context token
+            try:
+                token_enum = ResponseToken(token)
+                from pwnomcp.context import context_manager
+                context_type = context_manager.get_context_type(token_enum)
+                if context_type:
+                    context_manager.store_context(context_type, output)
+            except:
+                pass
                 
-                # Store in context cache if it's a context command
-                try:
-                    from pwnomcp.context import context_manager
-                    context_type = context_manager.get_context_type(token)
-                    if context_type:
-                        context_manager.store_context(context_type, combined_output)
-                except:
-                    pass
+        # Clear result/log buffers
+        self.result = []
+        self.logs = []
+        
+    def _handle_notify(self, response: Dict[str, Any]):
+        """Handle notify messages (state changes)"""
+        message = response.get("message", "")
+        
+        if message == "running":
+            self.inferior_state = InferiorState.RUNNING
+            logger.debug("Inferior state: RUNNING")
             
-            # Queue response for processing
-            self.response_queue.put(parsed)
-            
-            # Trigger callbacks
-            if token in self.callbacks:
-                for callback in self.callbacks[token]:
-                    callback(parsed)
-                    
-        except Exception as e:
-            logger.error(f"Error handling response: {e}")
-            
-    def _update_inferior_state(self, response: GDBResponse):
-        """Update inferior state based on GDB notifications"""
-        if response.payload:
-            if "stopped" in str(response.payload):
+        elif message == "stopped":
+            if self.inferior_state != InferiorState.EXITED:
                 self.inferior_state = InferiorState.STOPPED
-            elif "running" in str(response.payload):
-                self.inferior_state = InferiorState.RUNNING
-            elif "exited" in str(response.payload):
-                self.inferior_state = InferiorState.EXITED
+                logger.debug("Inferior state: STOPPED")
                 
-    def _send_command(self, token: ResponseToken, command: str):
-        """Queue command for sending to GDB"""
-        self.command_queue.put((token, command))
-        
-        # Register command for context tracking if needed
-        pass
-        
+        elif message == "thread-group-exited":
+            self.inferior_state = InferiorState.EXITED
+            logger.debug("Inferior state: EXITED")
+            
+        elif message == "thread-group-started":
+            # Handle attach case (following pwndbg-gui)
+            self.inferior_state = InferiorState.RUNNING
+            logger.debug("Inferior state: RUNNING (attached)")
+            
     def execute(self, command: str, token: Optional[ResponseToken] = None) -> ResponseToken:
         """
-        Execute a GDB command
+        Execute a GDB command synchronously
         Returns the token used for tracking the response
         """
-        if not token:
+        if not self.controller:
+            raise RuntimeError("GDB controller not initialized")
+            
+        # Use provided token or default to USER
+        if token is None:
             token = ResponseToken.USER
             
-        self._send_command(token, command)
+        # Send command with token prefix
+        with self._command_lock:
+            prefixed_cmd = f"{token.value}-{command}"
+            self.controller.write(prefixed_cmd, read_response=False)
+            logger.debug(f"Sent command: {command} (token: {token.value})")
+            
         return token
         
     def execute_and_wait(self, command: str, timeout: float = 5.0) -> Optional[str]:
         """
-        Execute command and wait for response
+        Execute command and wait for response synchronously
         Returns the console output or None on timeout
         """
-        token = ResponseToken(self._token_counter)
+        if not self.controller:
+            return None
+            
+        # Create unique token
+        token_value = self._token_counter
         self._token_counter += 1
         
-        result_event = threading.Event()
-        result_output = []
-        
-        def callback(response: GDBResponse):
-            if response.type == "output":
-                result_output.append(response.payload)
-                result_event.set()
-                
-        self.register_callback(token, callback)
-        self._send_command(token, command)
-        
-        if result_event.wait(timeout):
-            self.unregister_callback(token, callback)
-            return "".join(result_output)
-        else:
-            self.unregister_callback(token, callback)
-            return None
+        # Clear any existing buffer for this token
+        with self._response_lock:
+            self._response_buffers[token_value] = []
             
-    def register_callback(self, token: ResponseToken, callback: Callable):
-        """Register callback for specific token responses"""
-        if token not in self.callbacks:
-            self.callbacks[token] = []
-        self.callbacks[token].append(callback)
-        
-    def unregister_callback(self, token: ResponseToken, callback: Callable):
-        """Unregister callback"""
-        if token in self.callbacks:
-            self.callbacks[token].remove(callback)
-            if not self.callbacks[token]:
-                del self.callbacks[token]
-                
-    def get_response(self, timeout: float = 0.1) -> Optional[GDBResponse]:
-        """Get response from queue"""
-        try:
-            return self.response_queue.get(timeout=timeout)
-        except queue.Empty:
-            return None
+        # Send command
+        with self._command_lock:
+            prefixed_cmd = f"{token_value}-{command}"
+            self.controller.write(prefixed_cmd, read_response=False)
             
+        # Wait for response with polling
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            with self._response_lock:
+                if token_value in self._response_buffers:
+                    # We have a response
+                    output = "".join(self._response_buffers[token_value])
+                    # Clean up
+                    del self._response_buffers[token_value]
+                    return output
+                    
+            time.sleep(0.01)  # Small sleep to avoid busy waiting
+            
+        # Timeout - clean up
+        with self._response_lock:
+            if token_value in self._response_buffers:
+                del self._response_buffers[token_value]
+                
+        return None
+        
     def is_running(self) -> bool:
         """Check if inferior is running"""
         return self.inferior_state == InferiorState.RUNNING
@@ -346,31 +341,34 @@ class GDBController:
             
     def get_stdout(self, clear: bool = False) -> str:
         """Get buffered stdout content"""
-        content = "".join(self._stdout_buffer)
-        if clear:
-            self._stdout_buffer.clear()
-        return content
+        with self._response_lock:
+            content = "".join(self._stdout_buffer)
+            if clear:
+                self._stdout_buffer.clear()
+            return content
         
     def get_stderr(self, clear: bool = False) -> str:
         """Get buffered stderr content"""
-        content = "".join(self._stderr_buffer)
-        if clear:
-            self._stderr_buffer.clear()
-        return content
+        with self._response_lock:
+            content = "".join(self._stderr_buffer)
+            if clear:
+                self._stderr_buffer.clear()
+            return content
         
     def get_console(self, clear: bool = False) -> str:
         """Get buffered console output"""
-        content = "".join(self._console_buffer)
-        if clear:
-            self._console_buffer.clear()
-        return content
+        with self._response_lock:
+            content = "".join(self._console_buffer)
+            if clear:
+                self._console_buffer.clear()
+            return content
         
     def clear_buffers(self):
         """Clear all output buffers"""
-        self._stdout_buffer.clear()
-        self._stderr_buffer.clear()
-        self._console_buffer.clear()
-        
+        with self._response_lock:
+            self._stdout_buffer.clear()
+            self._stderr_buffer.clear()
+            self._console_buffer.clear()
 
 
 # Global GDB controller instance

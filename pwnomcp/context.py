@@ -1,9 +1,9 @@
 """
 Context management and routing for PwnoMCP
-Combines context caching, automatic updates, and token-based routing
+Combines context caching and token-based routing
+Following pwndbg-gui's synchronous design pattern
 """
 
-import asyncio
 import logging
 from typing import Dict, Optional
 from dataclasses import dataclass
@@ -71,6 +71,7 @@ class ContextManager:
     - Updates contexts after every user command
     - Caches context data
     - Routes updates via tokens
+    - Fully synchronous (no asyncio)
     """
     
     def __init__(self):
@@ -85,8 +86,8 @@ class ContextManager:
             'backtrace': ResponseToken.CONTEXT_BACKTRACE,
         }
         
-    async def update_contexts(self, force: bool = False):
-        """Update all contexts (called after user commands)"""
+    def update_contexts(self, force: bool = False):
+        """Update all contexts synchronously"""
         # Only update if inferior is stopped
         if gdb_controller.inferior_state != InferiorState.STOPPED:
             logger.debug("Skipping context update - inferior not stopped")
@@ -145,8 +146,8 @@ class ContextManager:
             "timestamp": self.cache.timestamp.isoformat() if self.cache.timestamp else None
         }
         
-    async def on_command_executed(self, command: str):
-        """Called after any user command is executed"""
+    def on_command_executed(self, command: str):
+        """Called after any user command is executed (synchronous)"""
         # Skip context update for certain commands
         skip_commands = ["context", "help", "pwndbg"]
         if any(command.startswith(cmd) for cmd in skip_commands):
@@ -160,8 +161,8 @@ class ContextManager:
             # The inferior might still be running
             return
             
-        # Update contexts for other commands
-        await self.update_contexts()
+        # Update contexts synchronously
+        self.update_contexts()
         
     def get_context_type(self, token: Optional[ResponseToken]) -> Optional[str]:
         """Get context type for token (delegates to router)"""
