@@ -39,6 +39,9 @@ async def main():
     from pwnomcp.websocket import ws_manager
     await ws_manager.start(host="0.0.0.0", port=8765)
     
+    # Start processing WebSocket updates from GDB threads
+    asyncio.create_task(gdb_controller.process_ws_updates())
+    
     try:
         # Run the FastMCP server
         await mcp.run()
