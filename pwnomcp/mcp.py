@@ -79,7 +79,7 @@ def set_file(binary_path: str) -> str:
     :returns: Loading status and binary information
     """
     result = pwndbg_tools.set_file(binary_path)
-    return result
+    return format_file_result(result)
 
 
 @mcp.tool()

@@ -93,7 +93,7 @@ def format_session_result(result: Dict[str, Any]) -> str:
 
 def format_file_result(result: Dict[str, Any]) -> str:
     """Format set_file result"""
-    output = f"Command: {result['command']}\n"
+    output = ""
     if result.get('error'):
         output += f"Error: {result['error']}\n"
     else:
