@@ -8,6 +8,7 @@ Provides GDB/pwndbg functionality via MCP tools for LLM interaction.
 import logging
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
+import asyncio
 
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
@@ -265,7 +266,20 @@ def format_session_result(result: Dict[str, Any]) -> str:
 # Run the server
 def run_server():
     """Run the FastMCP server"""
-    mcp.run()
+    # Ensure tools and GDB are initialized
+    ensure_initialized()
+    try:
+        # Check if there's a running event loop
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop and loop.is_running():
+        # If we're in an existing event loop, schedule stdio transport
+        logger.info("Detected running event loop; scheduling server on existing loop")
+        loop.create_task(mcp.run_stdio_async())
+    else:
+        # No event loop running; start server normally
+        mcp.run()
 
 
 if __name__ == "__main__":
