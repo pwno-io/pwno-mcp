@@ -121,12 +121,12 @@ class PwndbgTools:
         
     def step_control(self, command: str) -> Dict[str, Any]:
         """
-        Execute stepping commands (run, c, n, s, ni, si)
+        Execute stepping commands (c, n, s, ni, si)
         
         This provides proper support for program flow control.
         
         Args:
-            command: Stepping command (run, continue, next, step, nexti, stepi)
+            command: Stepping command (continue, next, step, nexti, stepi)
             
         Returns:
             Dictionary with execution results and new state
@@ -147,10 +147,7 @@ class PwndbgTools:
         # Check if we can execute the command
         current_state = self.gdb.get_state()
         
-        if actual_command == "run":
-            # Run can be executed from any state
-            result = self.gdb.run()
-        elif actual_command == "continue" and current_state == "stopped":
+        if actual_command == "continue" and current_state == "stopped":
             result = self.gdb.continue_execution()
         elif actual_command in ["next", "step", "nexti", "stepi"] and current_state == "stopped":
             # Use the appropriate method
