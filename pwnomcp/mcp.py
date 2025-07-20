@@ -83,14 +83,19 @@ def set_file(binary_path: str) -> str:
 
 
 @mcp.tool()
-def run(args: str = "") -> str:
+def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
     """
     Run the loaded binary.
+    
+    Before running, you should either:
+    1. Set breakpoints at key locations (recommended), OR
+    2. Use interrupt_after to pause execution after N seconds
 
     :param args: Arguments to pass to the binary
+    :param interrupt_after: Optional - interrupt execution after N seconds
     :returns: Execution results and state
     """
-    result = pwndbg_tools.run(args)
+    result = pwndbg_tools.run(args, interrupt_after)
     return format_step_result(result)
 
 

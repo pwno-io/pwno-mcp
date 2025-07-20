@@ -449,6 +449,40 @@ class GdbController:
             "state": self._state
         }
         
+    def interrupt(self) -> Dict[str, Any]:
+        """Send interrupt signal to the running program"""
+        logger.info("Sending interrupt signal to GDB")
+        
+        # Use pygdbmi's interrupt_gdb method
+        try:
+            self.controller.interrupt_gdb()
+            # Give it a moment to process
+            import time
+            time.sleep(0.1)
+            
+            # Check for any output
+            responses = self.controller.get_gdb_response(timeout_sec=1.0, raise_error_on_timeout=False)
+            output_lines = []
+            
+            for response in responses:
+                if response.get("type") == "console" and response.get("payload"):
+                    output_lines.append(response["payload"])
+                elif response.get("type") == "notify":
+                    self._handle_notify(response)
+                    
+            return {
+                "success": True,
+                "output": "".join(output_lines),
+                "state": self._state
+            }
+        except Exception as e:
+            logger.error(f"Failed to interrupt: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "state": self._state
+            }
+        
     def get_state(self) -> str:
         """Get current inferior state"""
         return self._state

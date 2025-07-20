@@ -81,17 +81,18 @@ class PwndbgTools:
             "state": result["state"]
         }
         
-    def run(self, args: str = "") -> Dict[str, Any]:
+    def run(self, args: str = "", interrupt_after: Optional[float] = None) -> Dict[str, Any]:
         """
         Run the loaded binary
         
         Args:
             args: Arguments to pass to the binary
+            interrupt_after: Send interrupt signal after specified seconds
             
         Returns:
             Dictionary with execution results
         """
-        logger.info(f"Run with args: '{args}'")
+        logger.info(f"Run with args: '{args}', interrupt_after: {interrupt_after}")
         
         # Check if binary is loaded
         if not self.session.binary_loaded:
@@ -102,6 +103,27 @@ class PwndbgTools:
             
         # Run the program
         result = self.gdb.run(args)
+        
+        # If interrupt_after is specified and program is running, schedule interrupt
+        if interrupt_after and result.get("state") == "running":
+            import threading
+            
+            def interrupt_program():
+                logger.info(f"Interrupting program after {interrupt_after} seconds")
+                # Send interrupt signal
+                interrupt_result = self.gdb.interrupt()
+                logger.info(f"Interrupt result: {interrupt_result}")
+                
+            # Schedule interrupt
+            timer = threading.Timer(interrupt_after, interrupt_program)
+            timer.daemon = True
+            timer.start()
+            
+            # Note in the output
+            if result.get("output"):
+                result["output"] += f"\n[Note: Interrupt scheduled after {interrupt_after} seconds]"
+            else:
+                result["output"] = f"[Note: Interrupt scheduled after {interrupt_after} seconds]"
         
         # Update session state
         self.session.update_state(result["state"])

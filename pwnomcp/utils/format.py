@@ -1,5 +1,7 @@
 from typing import Dict, Any
+from .color import strip_color
 
+@strip_color
 def format_execute_result(result: Dict[str, Any]) -> str:
     """Format execute command result"""
     output = ""
@@ -11,6 +13,7 @@ def format_execute_result(result: Dict[str, Any]) -> str:
     return output
 
 
+@strip_color
 def format_launch_result(result: Dict[str, Any]) -> str:
     """Format launch command result"""
     if not result['success']:
@@ -33,6 +36,7 @@ def format_launch_result(result: Dict[str, Any]) -> str:
     return output
 
 
+@strip_color
 def format_step_result(result: Dict[str, Any]) -> str:
     """Format step control result"""
     if not result['success']:
@@ -52,6 +56,7 @@ def format_step_result(result: Dict[str, Any]) -> str:
     return output
 
 
+@strip_color
 def format_context_result(result: Dict[str, Any]) -> str:
     """Format context result"""
     if not result['success']:
@@ -68,6 +73,7 @@ def format_context_result(result: Dict[str, Any]) -> str:
         return f"[{result['context_type'].upper()}]\n{result['data']}"
 
 
+@strip_color
 def format_breakpoint_result(result: Dict[str, Any]) -> str:
     """Format breakpoint result"""
     if not result['success']:
@@ -75,6 +81,7 @@ def format_breakpoint_result(result: Dict[str, Any]) -> str:
     return result['output']
 
 
+@strip_color
 def format_memory_result(result: Dict[str, Any]) -> str:
     """Format memory read result"""
     if not result['success']:
@@ -85,12 +92,14 @@ def format_memory_result(result: Dict[str, Any]) -> str:
     return output
 
 
+@strip_color
 def format_session_result(result: Dict[str, Any]) -> str:
     """Format session info result"""
     import json
     return json.dumps(result, indent=2)
 
 
+@strip_color
 def format_file_result(result: Dict[str, Any]) -> str:
     """Format set_file result"""
     output = ""

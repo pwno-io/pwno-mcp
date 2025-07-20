@@ -117,15 +117,17 @@ Load a binary file for debugging:
 ```
 
 #### 3. Run
-Run the loaded binary:
+Run the loaded binary (set breakpoints first or use interrupt_after):
 ```json
 {
   "tool": "run",
   "arguments": {
-    "args": "arg1 arg2"
+    "args": "arg1 arg2",
+    "interrupt_after": 5.0
   }
 }
 ```
+Note: Either set breakpoints before running (recommended) or use `interrupt_after` to pause execution.
 
 #### 4. Step Control
 Control program execution:
@@ -190,17 +192,20 @@ Get current debugging session information:
    {"tool": "set_file", "arguments": {"binary_path": "/path/to/binary"}}
    ```
 
-2. Set breakpoints if needed:
+2. Choose your debugging approach:
+   
+   **Option A: Set breakpoints (recommended)**
    ```json
    {"tool": "set_breakpoint", "arguments": {"location": "main"}}
-   ```
-
-3. Run the binary:
-   ```json
    {"tool": "run", "arguments": {"args": ""}}
    ```
+   
+   **Option B: Run with timed interrupt**
+   ```json
+   {"tool": "run", "arguments": {"args": "", "interrupt_after": 3.0}}
+   ```
 
-4. Use stepping commands and examine state:
+3. Use stepping commands and examine state:
    ```json
    {"tool": "step_control", "arguments": {"command": "n"}}
    {"tool": "get_context", "arguments": {"context_type": "all"}}
