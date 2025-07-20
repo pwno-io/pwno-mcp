@@ -200,7 +200,14 @@ pwnomcp/
 
 2. **State Management**: The server maintains session state including binary info, breakpoints, watches, and command history.
 
-3. **Simple Output Parsing**: Leverages pygdbmi's native parsing instead of complex text processing, as recommended in the [pygdbmi documentation](https://cs01.github.io/pygdbmi/).
+3. **GDB/MI Native Commands**: Leverages GDB Machine Interface commands for structured output, as recommended in the [pygdbmi documentation](https://cs01.github.io/pygdbmi/):
+    - `-file-exec-and-symbols` instead of `file` for loading binaries
+    - `-break-insert` instead of `break` for structured breakpoint data
+    - `-exec-run`, `-exec-continue`, `-exec-next`, etc. for execution control
+    - `-data-evaluate-expression` for expression evaluation
+    - `-break-list`, `-break-delete`, `-break-enable/disable` for breakpoint management
+    
+    This provides structured JSON-like responses instead of parsing text output, making the server more reliable and efficient.
 
 4. **Per-Container Isolation**: Each container runs its own GDB instance, ensuring complete isolation between debugging sessions.
 

@@ -223,22 +223,108 @@ class PwndbgTools:
         """
         logger.info(f"Set breakpoint at {location}")
         
-        # Build break command
-        cmd = f"break {location}"
-        if condition:
-            cmd += f" if {condition}"
-            
-        result = self.gdb.execute_command(cmd)
+        # Use GDB controller's MI-based breakpoint method
+        result = self.gdb.set_breakpoint(location, condition)
         
-        # Parse breakpoint number from output if successful
-        if not result.get("error") and "Breakpoint" in result["output"]:
-            # Extract breakpoint number
-            import re
-            match = re.search(r"Breakpoint (\d+)", result["output"])
-            if match:
-                bp_num = int(match.group(1))
-                self.session.add_breakpoint(bp_num, location, condition)
+        # Extract breakpoint info from structured payload
+        if not result.get("error") and result.get("payload"):
+            bkpt_info = result["payload"].get("bkpt", {})
+            bp_num = bkpt_info.get("number")
+            if bp_num:
+                # Store as int
+                bp_num = int(bp_num)
+                # Use actual address from response if available
+                addr = bkpt_info.get("addr", location)
+                self.session.add_breakpoint(bp_num, addr, condition)
                 
+        return {
+            "success": not result.get("error"),
+            "output": result["output"],
+            "error": result.get("error"),
+            "breakpoint_info": result.get("payload", {}).get("bkpt") if result.get("payload") else None
+        }
+        
+    def list_breakpoints(self) -> Dict[str, Any]:
+        """
+        List all breakpoints
+        
+        Returns:
+            Dictionary with breakpoint list
+        """
+        logger.info("List breakpoints")
+        
+        result = self.gdb.list_breakpoints()
+        
+        # Format breakpoint information
+        breakpoints = []
+        if result.get("breakpoints"):
+            for bp in result["breakpoints"]:
+                bp_info = {
+                    "number": int(bp.get("number", 0)),
+                    "type": bp.get("type", "breakpoint"),
+                    "enabled": bp.get("enabled", "y") == "y",
+                    "address": bp.get("addr", ""),
+                    "function": bp.get("func", ""),
+                    "file": bp.get("file", ""),
+                    "line": bp.get("line", ""),
+                    "condition": bp.get("cond", ""),
+                    "hit_count": int(bp.get("times", 0))
+                }
+                breakpoints.append(bp_info)
+                
+        return {
+            "success": not result.get("error"),
+            "breakpoints": breakpoints,
+            "error": result.get("error")
+        }
+        
+    def delete_breakpoint(self, number: int) -> Dict[str, Any]:
+        """
+        Delete a breakpoint
+        
+        Args:
+            number: Breakpoint number to delete
+            
+        Returns:
+            Dictionary with deletion status
+        """
+        logger.info(f"Delete breakpoint #{number}")
+        
+        result = self.gdb.delete_breakpoint(number)
+        
+        # Update session state
+        if not result.get("error"):
+            self.session.remove_breakpoint(number)
+            
+        return {
+            "success": not result.get("error"),
+            "output": result["output"],
+            "error": result.get("error")
+        }
+        
+    def toggle_breakpoint(self, number: int, enable: bool) -> Dict[str, Any]:
+        """
+        Enable or disable a breakpoint
+        
+        Args:
+            number: Breakpoint number
+            enable: True to enable, False to disable
+            
+        Returns:
+            Dictionary with toggle status
+        """
+        action = "enable" if enable else "disable"
+        logger.info(f"{action} breakpoint #{number}")
+        
+        if enable:
+            result = self.gdb.enable_breakpoint(number)
+        else:
+            result = self.gdb.disable_breakpoint(number)
+            
+        # Update session state
+        if not result.get("error"):
+            self.session.toggle_breakpoint(number)
+            
         return {
             "success": not result.get("error"),
             "output": result["output"],
@@ -290,6 +376,18 @@ class PwndbgTools:
         
     def get_session_info(self) -> Dict[str, Any]:
         """Get current session information"""
+        # Sync breakpoints with GDB
+        bp_result = self.gdb.list_breakpoints()
+        if bp_result.get("breakpoints"):
+            # Clear and rebuild breakpoint list from GDB
+            self.session.breakpoints.clear()
+            for bp in bp_result["breakpoints"]:
+                self.session.add_breakpoint(
+                    int(bp.get("number", 0)),
+                    bp.get("addr", ""),
+                    bp.get("cond", "")
+                )
+                
         return {
             "session": self.session.to_dict(),
             "gdb_state": self.gdb.get_state()
