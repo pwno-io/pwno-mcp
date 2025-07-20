@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class GdbController:
     """Manages GDB instance and command execution via Machine Interface"""
     
-    def __init__(self, gdb_path: str = "gdb"):
+    def __init__(self, pwnodbg: str = "pwndbg"):
         """
         Initialize GDB controller
         
@@ -25,7 +25,7 @@ class GdbController:
             gdb_path: Path to GDB executable (default: "gdb")
         """
         self.controller = gdbcontroller.GdbController(
-            command=[gdb_path, "--interpreter=mi3", "--quiet"]
+            command=[pwnodbg, "--interpreter=mi3", "--quiet"]
         )
         self._initialized = False
         self._inferior_pid = None
