@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 def format_execute_result(result: Dict[str, Any]) -> str:
     """Format execute command result"""
-    output = f"Command: {result['command']}\n"
+    output = ""
     if result.get('error'):
         output += f"Error: {result['error']}\n"
     if result.get('output'):
@@ -38,7 +38,7 @@ def format_step_result(result: Dict[str, Any]) -> str:
     if not result['success']:
         return f"Step failed: {result['error']}\nState: {result['state']}"
     
-    output = f"Command: {result['command']}\n"
+    output = ""
     if result.get('output'):
         output += f"Output:\n{result['output']}\n"
     output += f"State: {result['state']}"
