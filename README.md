@@ -1,251 +1,221 @@
-# Pwno MCP
+# Pwno MCP Server
 
-MCP server for Pwno, the Autonomous low-level security research agent. This server provides debugging capabilities through pwndbg/GDB integration for automated security research in containerized environments.
+An MCP (Model Context Protocol) server for autonomous low-level security research, providing GDB/pwndbg functionality for LLM interaction.
 
 ## Overview
 
-PwnoMCP is a Model Context Protocol (MCP) server that exposes pwndbg functionality for autonomous security research agents. Each container runs its own MCP server instance with pre-configured pwndbg environment, allowing the autonomous agent to perform low-level debugging and analysis tasks.
+Pwno MCP is designed to run in containerized environments (K8s) and expose debugging capabilities through the Model Context Protocol. Each container runs an isolated instance with its own GDB session, making it perfect for parallel security research tasks.
+
+## Architecture
+
+```
+┌─────────────┐     MCP Protocol      ┌──────────────┐
+│ LLM/Client  │ ◄─────────────────────► │ Pwno MCP     │
+└─────────────┘                        │   Server     │
+                                       └──────┬───────┘
+                                              │
+                                       ┌──────▼───────┐
+                                       │ GDB/pwndbg   │
+                                       │  Controller  │
+                                       └──────┬───────┘
+                                              │
+                                       ┌──────▼───────┐
+                                       │   Target     │
+                                       │   Binary     │
+                                       └──────────────┘
+```
 
 ## Features
 
-### Core Debugging Tools
-
-- **pwnodbg_execute**: Execute arbitrary GDB commands
-- **pwnodbg_launch**: Launch binaries or attach to processes
-- **pwnodbg_run**: Start execution of loaded binaries
-- **pwnodbg_continue**: Continue execution after breakpoints
-- **pwnodbg_step**: Single-step execution (step, next, stepi, nexti)
-- **pwnodbg_context**: Display debugging context (registers, stack, code)
-
-### Memory Analysis Tools
-
-- **pwnodbg_heap**: Analyze heap chunks, bins, arenas, tcache
-- **pwnodbg_vmmap**: Display virtual memory mappings
-- **pwnodbg_search**: Search memory for patterns
-- **pwnodbg_telescope**: Recursively dereference pointers
-- **pwnodbg_rop**: Find and analyze ROP gadgets
-
-### Breakpoint Management
-
-- **pwnodbg_breakpoint**: Set, list, delete breakpoints with conditions
-- **pwnodbg_watchpoint**: Set memory watchpoints (read/write/access)
-- **pwnodbg_catch**: Set catchpoints for system events
-
-### Special Features
-
-- **pwnodbg_try_free**: Attempt to free memory chunks (heap exploitation)
-
-### Output Management
-
-- **pwnodbg_stdio**: Check buffered output from GDB and inferior process
-- **pwnodbg_clear_stdio**: Clear all stdio buffers  
-- **pwnodbg_wait_for_output**: Wait for specific output patterns
+- **Execute Tool**: Run arbitrary GDB/pwndbg commands
+- **Launch Tool**: Load and run binaries with full control
+- **Step Control**: Support for all stepping commands (run, c, n, s, ni, si)
+- **Context Retrieval**: Get registers, stack, disassembly, code, and backtrace
+- **Breakpoint Management**: Set conditional breakpoints
+- **Memory Operations**: Read memory in various formats
+- **Session State**: Track debugging session state and history
 
 ## Installation
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd pwno-mcp
+### From Source
 
-# Install dependencies
+```bash
+git clone https://github.com/your-org/pwno-mcp.git
+cd pwno-mcp
 pip install -e .
 ```
+
+### Using pip
+
+```bash
+pip install pwno-mcp
+```
+
+## Prerequisites
+
+- GDB with Python support
+- pwndbg installed and configured in `~/.gdbinit`
+- Python 3.8+
 
 ## Usage
 
 ### Running the Server
 
 ```bash
-python run_server.py
-```
-
-Or using the module directly:
-
-```bash
 python -m pwnomcp
 ```
 
-### Docker Integration
-
-The server is designed to run inside Docker containers with pwndbg pre-installed:
+### Docker Deployment
 
 ```dockerfile
 FROM ubuntu:22.04
 
-# Install pwndbg and dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
-    gdb python3 python3-pip git \
-    && git clone https://github.com/pwndbg/pwndbg \
-    && cd pwndbg && ./setup.sh
+    gdb \
+    python3 \
+    python3-pip \
+    git \
+    wget
 
-# Install PwnoMCP
-COPY . /app/pwno-mcp
-WORKDIR /app/pwno-mcp
+# Install pwndbg
+RUN git clone https://github.com/pwndbg/pwndbg && \
+    cd pwndbg && \
+    ./setup.sh
+
+# Install pwno-mcp
+COPY . /app
+WORKDIR /app
 RUN pip install -e .
 
-# Expose MCP server
+# Run the MCP server
 CMD ["python", "-m", "pwnomcp"]
 ```
 
-### Example Tool Usage
+### MCP Tools
 
-```python
-# Launch a binary
-{
-    "tool": "pwnodbg_launch",
-    "arguments": {
-        "binary": "/path/to/binary",
-        "args": ["arg1", "arg2"],
-        "env": {"VAR": "value"}
-    }
-}
-
-# Set a breakpoint
-{
-    "tool": "pwnodbg_breakpoint",
-    "arguments": {
-        "action": "set",
-        "location": "main",
-        "condition": "$rax == 0x1337"
-    }
-}
-
-# Search memory
-{
-    "tool": "pwnodbg_search",
-    "arguments": {
-        "pattern": "flag{",
-        "type": "string",
-        "writable": false
-    }
-}
-
-# Analyze heap
-{
-    "tool": "pwnodbg_heap",
-    "arguments": {
-        "command": "chunks"
-    }
-}
-```
-
-## Architecture
-
-The server uses a modular architecture with FastMCP:
-
-- **Core**: GDB controller wrapper with thread-safe async operations
-- **Tools**: MCP tool implementations using `@mcp.tool()` decorator
-- **Server**: FastMCP server with automatic tool registration
-- **WebSocket**: Real-time output streaming for frontend integration
-
-Key design patterns:
-
-- **Non-blocking execution**: Commands execute immediately without waiting for output
-- **Buffered stdio**: All output is buffered and can be retrieved via stdio tools
-- **Live updates**: WebSocket server broadcasts GDB output in real-time
-- **Context routing**: Intelligent routing of output to appropriate contexts
-- **FastMCP integration**: Simplified tool registration and server management
-- **Thread separation**: Separate threads for reading/writing GDB commands
-- **State management**: Tracks inferior process state
-- **Automatic .gdbinit loading**: Ensures pwndbg is properly initialized
-
-### Output Handling Strategy
-
-Unlike traditional approaches, this server separates command execution from output retrieval:
-
-1. All commands execute immediately and return confirmation
-2. Output is buffered in separate streams (stdout, stderr, console)
-3. Agents check output using `pwnodbg_stdio` tool when needed
-4. Frontend clients receive live updates via WebSocket
-5. This prevents blocking and timeout issues common with GDB integration
-
-### WebSocket Live Updates
-
-The server includes a WebSocket server (default port 8765) that broadcasts:
-
-- **Console output**: GDB command results
-- **Context updates**: Registers, stack, code, disassembly (automatically after each command)
-- **State changes**: Inferior process state transitions
-- **Memory/Heap**: Memory dumps and heap analysis
-- **Stdout/Stderr**: Program output streams
-
-#### Automatic Context Updates (pwndbg-gui pattern)
-
-Following pwndbg-gui's design, contexts are automatically updated after every user command:
-
-1. User executes any command (via MCP tools)
-2. Command output goes to console (USER token)
-3. Context update commands are automatically sent
-4. Context data is routed to specific components via tokens
-5. Context data is cached for `pwnodbg_context` tool
-
-This ensures the frontend always shows current state after commands like `step`, `next`, `continue`, etc.
-
-#### WebSocket Message Format
-
+#### 1. Execute
+Execute any GDB/pwndbg command:
 ```json
 {
-  "type": "console|stdout|stderr|registers|stack|code|state|...",
-  "data": "output content",
-  "token": 123,  // Optional command token
-  "timestamp": 1234567890.123
+  "tool": "execute",
+  "arguments": {
+    "command": "info registers"
+  }
 }
 ```
 
-#### Using the WebSocket Client
-
-**HTML Client** (for web frontends):
-```bash
-# Open examples/websocket_client.html in a browser
+#### 2. Launch
+Launch a binary for debugging:
+```json
+{
+  "tool": "launch",
+  "arguments": {
+    "binary_path": "/path/to/binary",
+    "args": "arg1 arg2",
+    "mode": "run"
+  }
+}
 ```
 
-**Python Client** (for debugging):
-```bash
-python examples/websocket_client.py --url ws://localhost:8765
+#### 3. Step Control
+Control program execution:
+```json
+{
+  "tool": "step_control",
+  "arguments": {
+    "command": "n"
+  }
+}
 ```
 
-**JavaScript Integration**:
-```javascript
-const ws = new WebSocket('ws://localhost:8765');
+#### 4. Get Context
+Retrieve debugging context:
+```json
+{
+  "tool": "get_context",
+  "arguments": {
+    "context_type": "all"
+  }
+}
+```
 
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  console.log(`${data.type}: ${data.data}`);
-};
+#### 5. Set Breakpoint
+Set breakpoints with optional conditions:
+```json
+{
+  "tool": "set_breakpoint",
+  "arguments": {
+    "location": "main",
+    "condition": "$rax == 0"
+  }
+}
+```
+
+#### 6. Get Memory
+Read memory at specific addresses:
+```json
+{
+  "tool": "get_memory",
+  "arguments": {
+    "address": "0x400000",
+    "size": 128,
+    "format": "hex"
+  }
+}
+```
+
+#### 7. Get Session Info
+Get current debugging session information:
+```json
+{
+  "tool": "get_session_info",
+  "arguments": {}
+}
 ```
 
 ## Development
 
-### Adding New Tools
+### Project Structure
 
-Create a new tool function in `pwnomcp/tools/`:
-
-```python
-from pwnomcp.server import mcp
-from pwnomcp.core.gdb_controller import gdb_controller
-
-@mcp.tool()
-async def pwnodbg_mytool(param: str) -> str:
-    """
-    Description of the tool
-    
-    Args:
-        param: Parameter description
-    """
-    await ensure_gdb_initialized()
-    
-    # Tool implementation
-    result = gdb_controller.execute_and_wait(f"gdb command {param}")
-    return result or "Command completed"
+```
+pwnomcp/
+├── __init__.py
+├── __main__.py
+├── server.py          # FastMCP server implementation
+├── gdb/
+│   ├── __init__.py
+│   └── controller.py  # GDB/pygdbmi interface
+├── state/
+│   ├── __init__.py
+│   └── session.py     # Session state management
+└── tools/
+    ├── __init__.py
+    └── pwndbg.py      # MCP tool implementations
 ```
 
-The FastMCP framework automatically:
-- Registers the tool with the MCP server
-- Generates JSON schema from type hints
-- Handles parameter validation
-- Manages async execution
+### Key Design Decisions
+
+1. **Synchronous Tool Execution**: Unlike pwndbg-gui, each MCP tool invocation returns complete results immediately, suitable for LLM interaction.
+
+2. **State Management**: The server maintains session state including binary info, breakpoints, watches, and command history.
+
+3. **Simple Output Parsing**: Leverages pygdbmi's native parsing instead of complex text processing, as recommended in the [pygdbmi documentation](https://cs01.github.io/pygdbmi/).
+
+4. **Per-Container Isolation**: Each container runs its own GDB instance, ensuring complete isolation between debugging sessions.
+
+## Future Enhancements
+
+- WebSocket endpoint for streaming I/O
+- Advanced memory analysis tools
+- Heap exploitation helpers
+- ROP chain generation
+- Symbolic execution integration
 
 ## License
 
-[License information]
+MIT License
+
+## Contributing
+
+Contributions are welcome! Please submit pull requests or open issues on GitHub.

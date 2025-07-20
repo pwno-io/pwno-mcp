@@ -1,268 +1,299 @@
 """
-MCP tools for pwndbg integration
-Provides execution and control flow tools for debugging
+Pwndbg tools for MCP server
+
+Provides MCP tool implementations for GDB/pwndbg commands.
+Each tool returns immediate results suitable for LLM interaction.
 """
 
 import logging
-from typing import Optional, Dict, List
-from pathlib import Path
-import time
-
-from pwnomcp.mcp_server import mcp
-from pwnomcp.gdb_controller import gdb_controller, ResponseToken, InferiorState
+from typing import Dict, Any, Optional
+from pwnomcp.gdb import GdbController
+from pwnomcp.state import SessionState
 
 logger = logging.getLogger(__name__)
 
 
-async def ensure_gdb_initialized():
-    """Ensure GDB controller is initialized"""
-    if not gdb_controller.controller:
-        if not gdb_controller.initialize():
-            raise RuntimeError("Failed to initialize GDB controller")
-
-
-@mcp.tool()
-async def pwnodbg_execute(command: str) -> str:
-    """
-    Execute any GDB command and return output
+class PwndbgTools:
+    """MCP tools for pwndbg interaction"""
     
-    Args:
-        command: The GDB command to execute
-    """
-    await ensure_gdb_initialized()
-    
-    # Execute and get result
-    result = gdb_controller.execute_and_wait(command)
-    
-    # Following pwndbg-gui: update contexts after user command
-    from pwnomcp.context import context_manager
-    context_manager.on_command_executed(command)
-    
-    return result if result else f"Command executed: {command} (no output)"
-
-
-# @mcp.tool()
-# async def pwnodbg_try_free(address: str) -> str:
-#     """
-#     Attempt to free a memory chunk at the given address
-    
-#     Args:
-#         address: The address of the chunk to free (hex or decimal)
-#     """
-#     await ensure_gdb_initialized()
-    
-#     gdb_controller.execute(f"try_free {address}")
-#     return f"Executing try_free on {address}"
-
-
-@mcp.tool()
-async def pwnodbg_launch(
-    binary: Optional[str] = None,
-    pid: Optional[int] = None,
-    args: Optional[List[str]] = None,
-    env: Optional[Dict[str, str]] = None
-) -> str:
-    """
-    Launch a binary or attach to a process
-    
-    Args:
-        binary: Path to the binary to debug
-        pid: PID to attach to (alternative to binary)
-        args: Arguments to pass to the binary
-        env: Environment variables to set
-    """
-    await ensure_gdb_initialized()
-    
-    output = []
-    
-    # Handle attachment to PID
-    if pid is not None:
-        gdb_controller.execute(f"attach {pid}")
-        output.append(f"Attaching to process {pid}")
+    def __init__(self, gdb_controller: GdbController, session_state: SessionState):
+        """
+        Initialize pwndbg tools
         
-    # Handle binary loading
-    elif binary is not None:
-        # Verify binary exists
-        if not Path(binary).exists():
-            return f"Binary not found: {binary}"
+        Args:
+            gdb_controller: GDB controller instance
+            session_state: Session state manager
+        """
+        self.gdb = gdb_controller
+        self.session = session_state
+        
+    def execute(self, command: str) -> Dict[str, Any]:
+        """
+        Execute arbitrary GDB/pwndbg command
+        
+        This is the general-purpose tool for running any GDB command.
+        
+        Args:
+            command: GDB command to execute
+            
+        Returns:
+            Dictionary containing:
+                - command: The executed command
+                - output: Console output from command
+                - error: Any error messages
+                - state: Current inferior state after command
+        """
+        logger.info(f"Execute tool: {command}")
+        
+        # Execute the command
+        result = self.gdb.execute_command(command)
+        
+        # Update session state
+        self.session.update_state(result["state"])
+        self.session.record_command(command, result)
+        
+        return result
+        
+    def launch(self, binary_path: str, args: str = "", mode: str = "run") -> Dict[str, Any]:
+        """
+        Launch binary for debugging with proper support for execution control
+        
+        This tool handles the complexity of launching and controlling binary execution,
+        learning from pwndbg-gui's inferior handler design.
+        
+        Args:
+            binary_path: Path to binary to debug
+            args: Arguments to pass to the binary
+            mode: Launch mode - "run" (start fresh) or "start" (break at entry)
+            
+        Returns:
+            Dictionary with launch results and initial state
+        """
+        logger.info(f"Launch tool: {binary_path} with args '{args}' in mode '{mode}'")
+        
+        results = {}
         
         # Load the binary
-        gdb_controller.execute(f"file {binary}")
-        output.append(f"Loading binary: {binary}")
+        load_result = self.gdb.set_file(binary_path)
+        results["load"] = load_result
         
-        # Set environment variables if provided
-        if env:
-            for key, value in env.items():
-                gdb_controller.execute(f"set environment {key}={value}")
-            output.append(f"Set {len(env)} environment variables")
-        
-        # Set arguments if provided
-        if args:
-            args_str = " ".join(args)
-            gdb_controller.execute(f"set args {args_str}")
-            output.append(f"Set arguments: {args_str}")
+        if load_result["error"]:
+            return {
+                "success": False,
+                "error": f"Failed to load binary: {load_result['error']}",
+                "results": results
+            }
             
-        gdb_controller.inferior_state = InferiorState.LOADED
+        # Update session state
+        self.session.binary_path = binary_path
+        self.session.binary_loaded = True
         
-    else:
-        return "Must provide either 'binary' or 'pid' parameter"
+        # Get entry point
+        entry_result = self.gdb.execute_command("info target")
+        results["entry_info"] = entry_result
         
-    return "\n".join(output)
-
-
-@mcp.tool()
-async def pwnodbg_run(until: Optional[str] = None) -> str:
-    """
-    Run the loaded binary from the beginning
-    
-    Args:
-        until: Run until this address/symbol (optional)
-    """
-    await ensure_gdb_initialized()
-    
-    if gdb_controller.inferior_state == InferiorState.NONE:
-        return "No binary loaded. Use pwnodbg_launch first."
+        # Launch based on mode
+        if mode == "run":
+            # Run directly
+            launch_result = self.gdb.run(args)
+        elif mode == "start":
+            # Break at entry and run
+            self.gdb.execute_command("break _start")
+            launch_result = self.gdb.run(args)
+        else:
+            return {
+                "success": False,
+                "error": f"Unknown launch mode: {mode}",
+                "results": results
+            }
+            
+        results["launch"] = launch_result
         
-    command = "run"
-    if until:
-        command = f"run {until}"
-        
-    # Send run command
-    gdb_controller.execute(command, ResponseToken.USER)
-    
-    # Update contexts after run (if it stops at a breakpoint)
-    from pwnomcp.context import context_manager
-    context_manager.on_command_executed(command)
-    
-    return f"Executing: {command}"
-
-
-@mcp.tool()
-async def pwnodbg_continue() -> str:
-    """Continue execution from current position"""
-    await ensure_gdb_initialized()
-    
-    if not gdb_controller.is_stopped():
-        return "Process is not stopped. Cannot continue."
-        
-    gdb_controller.execute("continue", ResponseToken.USER)
-    
-    # Update contexts after continue (if it stops at a breakpoint)
-    from pwnomcp.context import context_manager
-    context_manager.on_command_executed("continue")
-    
-    return "Continuing execution..."
-
-
-@mcp.tool()
-async def pwnodbg_step(type: str = "step", count: int = 1) -> str:
-    """
-    Single-step debugging commands
-    
-    Args:
-        type: Type of step operation (step, next, stepi, nexti)
-        count: Number of steps to execute
-    """
-    await ensure_gdb_initialized()
-    
-    if not gdb_controller.is_stopped():
-        return "Process is not stopped. Cannot step."
-        
-    if type not in ["step", "next", "stepi", "nexti"]:
-        return "Invalid step type. Use: step, next, stepi, or nexti"
-        
-    # Execute step command
-    command = f"{type} {count}" if count > 1 else type
-    gdb_controller.execute(command, ResponseToken.USER)
-    
-    # Update contexts after step command
-    from pwnomcp.context import context_manager
-    context_manager.on_command_executed(command)
-    
-    return f"Executing: {command} (context will be updated)"
-
-
-@mcp.tool()
-async def pwnodbg_context(sections: Optional[List[str]] = None, refresh: bool = False) -> str:
-    """
-    Display debugging context information from cache
-    
-    Args:
-        sections: Context sections to display (regs, stack, code, disasm, backtrace, heap, all)
-                 Default is ["all"]
-        refresh: Force refresh context before returning (default: False)
-    """
-    await ensure_gdb_initialized()
-    
-    if sections is None:
-        sections = ["all"]
-        
-    valid_sections = ["regs", "stack", "code", "disasm", "backtrace", "heap", "all"]
-    
-    # Validate sections
-    for section in sections:
-        if section not in valid_sections:
-            return f"Invalid section: {section}. Valid sections: {', '.join(valid_sections)}"
-    
-    # Import context manager
-    from pwnomcp.context import context_manager
-    
-    # Force refresh if requested
-    if refresh:
-        context_manager.update_contexts(force=True)
-        # Wait a bit for context to be populated
-        import time
-        time.sleep(0.5)
-    
-    # Get cached context
-    cached = context_manager.get_cached_context()
-    
-    # Check if we have any cached data
-    if not cached.get("timestamp"):
-        # No cache, trigger update
-        context_manager.update_contexts()
-        import time
-        time.sleep(0.5)
-        cached = context_manager.get_cached_context()
-        
-        if not cached.get("timestamp"):
-            return "No context available. Is the process stopped?"
-    
-    output = []
-    
-    if "all" in sections:
-        # Return all cached sections
-        section_map = {
-            "registers": "REGISTERS",
-            "stack": "STACK",
-            "code": "CODE",
-            "disasm": "DISASSEMBLY",
-            "backtrace": "BACKTRACE",
-            "heap": "HEAP"
+        # Get initial context if stopped
+        if self.gdb.get_state() == "stopped":
+            results["context"] = self._get_full_context()
+            
+        return {
+            "success": not launch_result.get("error"),
+            "state": self.gdb.get_state(),
+            "results": results
         }
         
-        for key, title in section_map.items():
-            if cached.get(key):
-                output.append(f"=== {title} ===\n{cached[key]}")
-    else:
-        # Return specific sections
-        section_key_map = {
-            "regs": "registers",
-            "stack": "stack",
-            "code": "code",
-            "disasm": "disasm",
-            "backtrace": "backtrace",
-            "heap": "heap"
+    def step_control(self, command: str) -> Dict[str, Any]:
+        """
+        Execute stepping commands (run, c, n, s, ni, si)
+        
+        This provides proper support for program flow control.
+        
+        Args:
+            command: Stepping command (run, continue, next, step, nexti, stepi)
+            
+        Returns:
+            Dictionary with execution results and new state
+        """
+        logger.info(f"Step control: {command}")
+        
+        # Map command aliases
+        command_map = {
+            "c": "continue",
+            "n": "next", 
+            "s": "step",
+            "ni": "nexti",
+            "si": "stepi"
         }
         
-        for section in sections:
-            key = section_key_map.get(section, section)
-            if cached.get(key):
-                output.append(f"=== {section.upper()} ===\n{cached[key]}")
-            else:
-                output.append(f"=== {section.upper()} ===\n(No data available)")
+        actual_command = command_map.get(command, command)
+        
+        # Check if we can execute the command
+        current_state = self.gdb.get_state()
+        
+        if actual_command == "run":
+            # Run can be executed from any state
+            result = self.gdb.run()
+        elif actual_command == "continue" and current_state == "stopped":
+            result = self.gdb.continue_execution()
+        elif actual_command in ["next", "step", "nexti", "stepi"] and current_state == "stopped":
+            # Use the appropriate method
+            method = getattr(self.gdb, actual_command.replace("i", "i" if "i" in actual_command else ""))
+            result = method()
+        else:
+            return {
+                "success": False,
+                "error": f"Cannot execute '{command}' in state '{current_state}'",
+                "state": current_state
+            }
+            
+        # Update session state
+        self.session.update_state(result["state"])
+        self.session.record_command(actual_command, result)
+        
+        # Get context if stopped
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+            
+        return {
+            "success": not result.get("error"),
+            "command": actual_command,
+            "output": result["output"],
+            "error": result.get("error"),
+            "state": result["state"],
+            "context": context
+        }
+        
+    def get_context(self, context_type: str = "all") -> Dict[str, Any]:
+        """
+        Get debugging context (registers, stack, disassembly, etc.)
+        
+        Args:
+            context_type: Type of context or "all" for complete context
+            
+        Returns:
+            Dictionary with requested context information
+        """
+        logger.info(f"Get context: {context_type}")
+        
+        if self.gdb.get_state() != "stopped":
+            return {
+                "success": False,
+                "error": f"Cannot get context while inferior is {self.gdb.get_state()}"
+            }
+            
+        if context_type == "all":
+            return {
+                "success": True,
+                "context": self._get_full_context()
+            }
+        else:
+            result = self.gdb.get_context(context_type)
+            return {
+                "success": not result.get("error"),
+                "context_type": context_type,
+                "data": result.get("data"),
+                "error": result.get("error")
+            }
+            
+    def set_breakpoint(self, location: str, condition: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Set a breakpoint
+        
+        Args:
+            location: Address or symbol for breakpoint
+            condition: Optional breakpoint condition
+            
+        Returns:
+            Dictionary with breakpoint information
+        """
+        logger.info(f"Set breakpoint at {location}")
+        
+        # Build break command
+        cmd = f"break {location}"
+        if condition:
+            cmd += f" if {condition}"
+            
+        result = self.gdb.execute_command(cmd)
+        
+        # Parse breakpoint number from output if successful
+        if not result.get("error") and "Breakpoint" in result["output"]:
+            # Extract breakpoint number
+            import re
+            match = re.search(r"Breakpoint (\d+)", result["output"])
+            if match:
+                bp_num = int(match.group(1))
+                self.session.add_breakpoint(bp_num, location, condition)
                 
-    if not output:
-        return "No context data available"
+        return {
+            "success": not result.get("error"),
+            "output": result["output"],
+            "error": result.get("error")
+        }
         
-    return "\n\n".join(output)
+    def _get_full_context(self) -> Dict[str, Any]:
+        """Get complete debugging context"""
+        contexts = {}
+        for ctx_type in ["regs", "stack", "disasm", "code", "backtrace"]:
+            ctx_result = self.gdb.get_context(ctx_type)
+            if not ctx_result.get("error"):
+                contexts[ctx_type] = ctx_result["data"]
+                
+        return contexts
+        
+    def get_memory(self, address: str, size: int = 64, format: str = "hex") -> Dict[str, Any]:
+        """
+        Read memory at specified address
+        
+        Args:
+            address: Memory address to read
+            size: Number of bytes to read
+            format: Output format (hex, string, int)
+            
+        Returns:
+            Dictionary with memory contents
+        """
+        logger.info(f"Read memory at {address}, {size} bytes as {format}")
+        
+        # Use appropriate pwndbg command based on format
+        if format == "hex":
+            cmd = f"hexdump {address} {size}"
+        elif format == "string":
+            cmd = f"x/s {address}"
+        else:
+            cmd = f"x/{size}b {address}"
+            
+        result = self.gdb.execute_command(cmd)
+        
+        return {
+            "success": not result.get("error"),
+            "address": address,
+            "size": size,
+            "format": format,
+            "data": result["output"],
+            "error": result.get("error")
+        }
+        
+    def get_session_info(self) -> Dict[str, Any]:
+        """Get current session information"""
+        return {
+            "session": self.session.to_dict(),
+            "gdb_state": self.gdb.get_state()
+        } 

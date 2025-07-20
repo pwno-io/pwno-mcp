@@ -1,13 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "pwno-mcp"
 version = "0.1.0"
-description = "MCP server for Pwno, the Autonomous low-level security research agent"
+description = "MCP server for autonomous low-level security research with pwndbg"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-    "mcp>=1.0.0",
-    "pygdbmi>=0.11.0.0",
-    "typing-extensions>=4.0.0",
-    "websockets>=12.0",
-    "aiohttp>=3.9.0",
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Pwno Team"},
 ]
+dependencies = [
+    "mcp",
+    "pygdbmi>=0.11.0.0",
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio",
+    "black",
+    "mypy",
+]
+
+[project.scripts]
+pwno-mcp = "pwnomcp.server:run_server"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pwnomcp*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true

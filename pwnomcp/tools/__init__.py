@@ -1,1 +1,5 @@
-"""MCP tools for pwndbg integration"""
+"""MCP tools for Pwno debugging"""
+
+from .pwndbg import PwndbgTools
+
+__all__ = ["PwndbgTools"] 

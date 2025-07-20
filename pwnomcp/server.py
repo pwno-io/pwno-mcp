@@ -1,43 +1,272 @@
 """
-PwnoMCP Server - MCP server for autonomous low-level security research
+Pwno MCP Server
+
+FastMCP server for autonomous low-level security research.
+Provides GDB/pwndbg functionality via MCP tools for LLM interaction.
 """
 
-import asyncio
 import logging
+from typing import Dict, Any, Optional
+from mcp.server.fastmcp import FastMCP
 
-# Import all tool modules to register them
-from pwnomcp.tools import pwndbg, memory, breakpoint, stdio
-from pwnomcp.gdb_controller import gdb_controller
-from pwnomcp.mcp_server import mcp
+from pwnomcp.gdb import GdbController
+from pwnomcp.state import SessionState
+from pwnomcp.tools import PwndbgTools
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+
+# Create FastMCP instance
+mcp = FastMCP("pwno-mcp")
+
+# Global instances (per-container)
+gdb_controller: Optional[GdbController] = None
+session_state: Optional[SessionState] = None
+pwndbg_tools: Optional[PwndbgTools] = None
+
+
+def ensure_initialized():
+    """Ensure the server is initialized"""
+    global gdb_controller, session_state, pwndbg_tools
+    
+    if pwndbg_tools is None:
+        logger.info("Initializing Pwno MCP server...")
+        
+        # Create instances
+        gdb_controller = GdbController()
+        session_state = SessionState()
+        pwndbg_tools = PwndbgTools(gdb_controller, session_state)
+        
+        # Initialize GDB with pwndbg
+        init_result = gdb_controller.initialize()
+        logger.info(f"GDB initialization: {init_result['status']}")
+        
+        logger.info("Pwno MCP server initialized successfully")
 
 
 @mcp.tool()
-async def initialize_debugger() -> str:
-    """Initialize the GDB debugger if not already initialized"""
-    if not gdb_controller.controller:
-        success = gdb_controller.initialize()
-        if success:
-            return "GDB debugger initialized successfully"
-        else:
-            return "Failed to initialize GDB debugger"
-    return "GDB debugger already initialized"
-
-
-async def main():
-    """Main entry point"""
-    logger.info("PwnoMCP server starting...")
+def execute(command: str) -> str:
+    """
+    Execute arbitrary GDB/pwndbg command
     
-    try:
-        # Run the FastMCP server
-        await mcp.run()
-    except asyncio.CancelledError:
-        logger.info("Server shutdown requested")
-    finally:
-        # Cleanup
-        gdb_controller.shutdown()
+    Args:
+        command: GDB command to execute
+        
+    Returns:
+        Command output and state information
+    """
+    ensure_initialized()
+    result = pwndbg_tools.execute(command)
+    return format_execute_result(result)
 
 
-# Entry point is in __main__.py
+@mcp.tool()
+def launch(
+    binary_path: str, 
+    args: str = "", 
+    mode: str = "run"
+) -> str:
+    """
+    Launch binary for debugging with execution control
+    
+    Args:
+        binary_path: Path to binary to debug
+        args: Arguments to pass to the binary
+        mode: Launch mode - 'run' (start fresh) or 'start' (break at entry)
+        
+    Returns:
+        Launch results and initial state
+    """
+    ensure_initialized()
+    result = pwndbg_tools.launch(binary_path, args, mode)
+    return format_launch_result(result)
+
+
+@mcp.tool()
+def step_control(command: str) -> str:
+    """
+    Execute stepping commands (run, c, n, s, ni, si)
+    
+    Args:
+        command: Stepping command - one of: run, c, continue, n, next, s, step, ni, nexti, si, stepi
+        
+    Returns:
+        Execution results and new state
+    """
+    ensure_initialized()
+    result = pwndbg_tools.step_control(command)
+    return format_step_result(result)
+
+
+@mcp.tool()
+def get_context(context_type: str = "all") -> str:
+    """
+    Get debugging context (registers, stack, disassembly, etc.)
+    
+    Args:
+        context_type: Type of context - one of: all, regs, stack, disasm, code, backtrace
+        
+    Returns:
+        Requested context information
+    """
+    ensure_initialized()
+    result = pwndbg_tools.get_context(context_type)
+    return format_context_result(result)
+
+
+@mcp.tool()
+def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
+    """
+    Set a breakpoint at specified location
+    
+    Args:
+        location: Address or symbol for breakpoint
+        condition: Optional breakpoint condition
+        
+    Returns:
+        Breakpoint information
+    """
+    ensure_initialized()
+    result = pwndbg_tools.set_breakpoint(location, condition)
+    return format_breakpoint_result(result)
+
+
+@mcp.tool()
+def get_memory(
+    address: str, 
+    size: int = 64, 
+    format: str = "hex"
+) -> str:
+    """
+    Read memory at specified address
+    
+    Args:
+        address: Memory address to read
+        size: Number of bytes to read
+        format: Output format - one of: hex, string, int
+        
+    Returns:
+        Memory contents in requested format
+    """
+    ensure_initialized()
+    result = pwndbg_tools.get_memory(address, size, format)
+    return format_memory_result(result)
+
+
+@mcp.tool()
+def get_session_info() -> str:
+    """
+    Get current debugging session information
+    
+    Returns:
+        Session state and debugging artifacts
+    """
+    ensure_initialized()
+    result = pwndbg_tools.get_session_info()
+    return format_session_result(result)
+
+
+# Result formatting functions
+def format_execute_result(result: Dict[str, Any]) -> str:
+    """Format execute command result"""
+    output = f"Command: {result['command']}\n"
+    if result.get('error'):
+        output += f"Error: {result['error']}\n"
+    if result.get('output'):
+        output += f"Output:\n{result['output']}"
+    output += f"\nState: {result['state']}"
+    return output
+
+
+def format_launch_result(result: Dict[str, Any]) -> str:
+    """Format launch command result"""
+    if not result['success']:
+        return f"Launch failed: {result['error']}"
+    
+    output = f"Launch successful\nState: {result['state']}\n"
+    
+    # Add load information
+    if 'load' in result.get('results', {}):
+        load_info = result['results']['load']
+        if load_info.get('output'):
+            output += f"\nLoad output:\n{load_info['output']}"
+    
+    # Add context if available
+    if 'context' in result.get('results', {}):
+        output += "\n\nInitial context:"
+        for ctx_type, ctx_data in result['results']['context'].items():
+            output += f"\n\n[{ctx_type.upper()}]\n{ctx_data}"
+    
+    return output
+
+
+def format_step_result(result: Dict[str, Any]) -> str:
+    """Format step control result"""
+    if not result['success']:
+        return f"Step failed: {result['error']}\nState: {result['state']}"
+    
+    output = f"Command: {result['command']}\n"
+    if result.get('output'):
+        output += f"Output:\n{result['output']}\n"
+    output += f"State: {result['state']}"
+    
+    # Add context if stopped
+    if result.get('context'):
+        output += "\n\nContext after step:"
+        for ctx_type, ctx_data in result['context'].items():
+            output += f"\n\n[{ctx_type.upper()}]\n{ctx_data}"
+    
+    return output
+
+
+def format_context_result(result: Dict[str, Any]) -> str:
+    """Format context result"""
+    if not result['success']:
+        return f"Context error: {result['error']}"
+    
+    if 'context' in result:
+        # Full context
+        output = "Full debugging context:"
+        for ctx_type, ctx_data in result['context'].items():
+            output += f"\n\n[{ctx_type.upper()}]\n{ctx_data}"
+        return output
+    else:
+        # Single context type
+        return f"[{result['context_type'].upper()}]\n{result['data']}"
+
+
+def format_breakpoint_result(result: Dict[str, Any]) -> str:
+    """Format breakpoint result"""
+    if not result['success']:
+        return f"Breakpoint error: {result['error']}"
+    return result['output']
+
+
+def format_memory_result(result: Dict[str, Any]) -> str:
+    """Format memory read result"""
+    if not result['success']:
+        return f"Memory read error: {result['error']}"
+    
+    output = f"Memory at {result['address']} ({result['size']} bytes, {result['format']} format):\n"
+    output += result['data']
+    return output
+
+
+def format_session_result(result: Dict[str, Any]) -> str:
+    """Format session info result"""
+    import json
+    return json.dumps(result, indent=2)
+
+
+# Run the server
+def run_server():
+    """Run the FastMCP server"""
+    mcp.run()
+
+
+if __name__ == "__main__":
+    run_server() 
