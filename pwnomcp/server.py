@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP("pwno-mcp")
 
-gdb_controller: Optional[GdbController] = None
-session_state: Optional[SessionState] = None
-pwndbg_tools: Optional[PwndbgTools] = None
+gdb_controller: GdbController = GdbController()
+session_state: SessionState = SessionState()
+pwndbg_tools: PwndbgTools = PwndbgTools(gdb_controller, session_state)
 
 
 def format_execute_result(result: Dict[str, Any]) -> str:
