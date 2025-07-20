@@ -54,69 +54,70 @@ class PwndbgTools:
         
         return result
         
-    def launch(self, binary_path: str, args: str = "", mode: str = "run") -> Dict[str, Any]:
+    def set_file(self, binary_path: str) -> Dict[str, Any]:
         """
-        Launch binary for debugging with proper support for execution control
-        
-        This tool handles the complexity of launching and controlling binary execution,
-        learning from pwndbg-gui's inferior handler design.
+        Set the file to debug
         
         Args:
             binary_path: Path to binary to debug
-            args: Arguments to pass to the binary
-            mode: Launch mode - "run" (start fresh) or "start" (break at entry)
             
         Returns:
-            Dictionary with launch results and initial state
+            Dictionary with file loading status
         """
-        logger.info(f"Launch tool: {binary_path} with args '{args}' in mode '{mode}'")
+        logger.info(f"Set file: {binary_path}")
         
-        results = {}
+        # Load the binary using GDB controller
+        result = self.gdb.set_file(binary_path)
         
-        # Load the binary
-        load_result = self.gdb.set_file(binary_path)
-        results["load"] = load_result
-        
-        if load_result["error"]:
-            return {
-                "success": False,
-                "error": f"Failed to load binary: {load_result['error']}",
-                "results": results
-            }
-            
-        # Update session state
-        self.session.binary_path = binary_path
-        self.session.binary_loaded = True
-        
-        # Get entry point
-        entry_result = self.gdb.execute_command("info target")
-        results["entry_info"] = entry_result
-        
-        # Launch based on mode
-        if mode == "run":
-            # Run directly
-            launch_result = self.gdb.run(args)
-        elif mode == "start":
-            # Break at entry and run
-            self.gdb.execute_command("break _start")
-            launch_result = self.gdb.run(args)
-        else:
-            return {
-                "success": False,
-                "error": f"Unknown launch mode: {mode}",
-                "results": results
-            }
-            
-        results["launch"] = launch_result
-        
-        # Get initial context if stopped
-        if self.gdb.get_state() == "stopped":
-            results["context"] = self._get_full_context()
+        # Update session state if successful
+        if not result.get("error"):
+            self.session.binary_path = binary_path
+            self.session.binary_loaded = True
             
         return {
-            "success": not launch_result.get("error"),
-            "state": self.gdb.get_state(),
-            "results": results
+            "success": not result.get("error"),
+            "output": result["output"],
+            "error": result.get("error"),
+            "state": result["state"]
+        }
+        
+    def run(self, args: str = "") -> Dict[str, Any]:
+        """
+        Run the loaded binary
+        
+        Args:
+            args: Arguments to pass to the binary
+            
+        Returns:
+            Dictionary with execution results
+        """
+        logger.info(f"Run with args: '{args}'")
+        
+        # Check if binary is loaded
+        if not self.session.binary_loaded:
+            return {
+                "success": False,
+                "error": "No binary loaded. Use set_file first."
+            }
+            
+        # Run the program
+        result = self.gdb.run(args)
+        
+        # Update session state
+        self.session.update_state(result["state"])
+        self.session.record_command(f"run {args}", result)
+        
+        # Get context if stopped
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+            
+        return {
+            "success": not result.get("error"),
+            "output": result["output"],
+            "error": result.get("error"),
+            "state": result["state"],
+            "context": context
         }
         
     def step_control(self, command: str) -> Dict[str, Any]:

@@ -105,20 +105,29 @@ Execute any GDB/pwndbg command:
 }
 ```
 
-#### 2. Launch
-Launch a binary for debugging:
+#### 2. Set File
+Load a binary file for debugging:
 ```json
 {
-  "tool": "launch",
+  "tool": "set_file",
   "arguments": {
-    "binary_path": "/path/to/binary",
-    "args": "arg1 arg2",
-    "mode": "run"
+    "binary_path": "/path/to/binary"
   }
 }
 ```
 
-#### 3. Step Control
+#### 3. Run
+Run the loaded binary:
+```json
+{
+  "tool": "run",
+  "arguments": {
+    "args": "arg1 arg2"
+  }
+}
+```
+
+#### 4. Step Control
 Control program execution:
 ```json
 {
@@ -129,7 +138,7 @@ Control program execution:
 }
 ```
 
-#### 4. Get Context
+#### 5. Get Context
 Retrieve debugging context:
 ```json
 {
@@ -140,7 +149,7 @@ Retrieve debugging context:
 }
 ```
 
-#### 5. Set Breakpoint
+#### 6. Set Breakpoint
 Set breakpoints with optional conditions:
 ```json
 {
@@ -152,7 +161,7 @@ Set breakpoints with optional conditions:
 }
 ```
 
-#### 6. Get Memory
+#### 7. Get Memory
 Read memory at specific addresses:
 ```json
 {
@@ -165,7 +174,7 @@ Read memory at specific addresses:
 }
 ```
 
-#### 7. Get Session Info
+#### 8. Get Session Info
 Get current debugging session information:
 ```json
 {
@@ -173,6 +182,29 @@ Get current debugging session information:
   "arguments": {}
 }
 ```
+
+### Typical Workflow
+
+1. Load a binary:
+   ```json
+   {"tool": "set_file", "arguments": {"binary_path": "/path/to/binary"}}
+   ```
+
+2. Set breakpoints if needed:
+   ```json
+   {"tool": "set_breakpoint", "arguments": {"location": "main"}}
+   ```
+
+3. Run the binary:
+   ```json
+   {"tool": "run", "arguments": {"args": ""}}
+   ```
+
+4. Use stepping commands and examine state:
+   ```json
+   {"tool": "step_control", "arguments": {"command": "n"}}
+   {"tool": "get_context", "arguments": {"context_type": "all"}}
+   ```
 
 ## Development
 

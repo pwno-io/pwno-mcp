@@ -8,7 +8,6 @@ Provides GDB/pwndbg functionality via MCP tools for LLM interaction.
 import logging
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
-import asyncio
 from contextlib import asynccontextmanager
 from pwnomcp.utils.format import *
 
@@ -79,13 +78,7 @@ def set_file(binary_path: str) -> str:
     :param binary_path: Path to the binary to load
     :returns: Loading status and binary information
     """
-    result = gdb_controller.set_file(binary_path)
-    
-    # Update session state if successful
-    if not result.get('error'):
-        session_state.binary_path = binary_path
-        session_state.binary_loaded = True
-        
+    result = pwndbg_tools.set_file(binary_path)
     return format_file_result(result)
 
 
@@ -97,49 +90,8 @@ def run(args: str = "") -> str:
     :param args: Arguments to pass to the binary
     :returns: Execution results and state
     """
-    # Check if binary is loaded
-    if not session_state.binary_loaded:
-        return "Error: No binary loaded. Use set_file first."
-        
-    result = gdb_controller.run(args)
-    
-    # Update session state
-    session_state.update_state(result["state"])
-    session_state.record_command(f"run {args}", result)
-    
-    # Get context if stopped
-    context = None
-    if result["state"] == "stopped":
-        context = pwndbg_tools._get_full_context()
-        
-    output = format_step_result({
-        "success": not result.get("error"),
-        "command": "run",
-        "output": result["output"],
-        "error": result.get("error"),
-        "state": result["state"],
-        "context": context
-    })
-    
-    return output
-
-
-@mcp.tool()
-def launch(
-    binary_path: str, 
-    args: str = "", 
-    mode: str = "run"
-) -> str:
-    """
-    Launch binary for debugging with execution control.
-
-    :param binary_path: Path to binary to debug
-    :param args: Arguments to pass to the binary
-    :param mode: Launch mode ('run' to start fresh or 'start' to break at entry)
-    :returns: Launch results and initial state
-    """
-    result = pwndbg_tools.launch(binary_path, args, mode)
-    return format_launch_result(result)
+    result = pwndbg_tools.run(args)
+    return format_step_result(result)
 
 
 @mcp.tool()
