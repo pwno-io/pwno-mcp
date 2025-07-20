@@ -14,23 +14,19 @@ from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
 from pwnomcp.tools import PwndbgTools
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Create FastMCP instance
 mcp = FastMCP("pwno-mcp")
 
-# Global instances (per-container)
 gdb_controller: Optional[GdbController] = None
 session_state: Optional[SessionState] = None
 pwndbg_tools: Optional[PwndbgTools] = None
 
 
-# Result formatting functions
 def format_execute_result(result: Dict[str, Any]) -> str:
     """Format execute command result"""
     output = f"Command: {result['command']}\n"
@@ -218,25 +214,10 @@ def get_session_info() -> str:
     return format_session_result(result)
 
 
-# Run the server
 def run_server():
-    """
-    Run the FastMCP server.
-
-    :returns: None
-    """
-    try:
-        # Check if there's a running event loop
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    if loop and loop.is_running():
-        # If we're in an existing event loop, schedule stdio transport
-        logger.info("Detected running event loop; scheduling server on existing loop")
-        loop.create_task(mcp.run_stdio_async())
-    else:
-        # No event loop running; start server normally
-        mcp.run()
+    mcp.run(
+        transport="streamable-http"
+    )
 
 
 if __name__ == "__main__":
