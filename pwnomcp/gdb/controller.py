@@ -44,13 +44,13 @@ class GdbController:
         results = []
         
         # Load .gdbinit if it exists
-        gdbinit = Path.home() / ".gdbinit"
-        if gdbinit.exists():
-            logger.info(f"Loading .gdbinit from {gdbinit}")
-            response = self.execute_command(f"source {gdbinit}")
-            results.append(response)
-        else:
-            logger.warning("No .gdbinit found")
+        # gdbinit = Path.home() / ".gdbinit"
+        # if gdbinit.exists():
+        #     logger.info(f"Loading .gdbinit from {gdbinit}")
+        #     response = self.execute_command(f"source {gdbinit}")
+        #     results.append(response)
+        # else:
+        #     logger.warning("No .gdbinit found")
             
         # Verify pwndbg is loaded
         pwndbg_check = self.execute_command("pwndbg")

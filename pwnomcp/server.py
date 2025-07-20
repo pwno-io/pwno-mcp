@@ -30,147 +30,6 @@ session_state: Optional[SessionState] = None
 pwndbg_tools: Optional[PwndbgTools] = None
 
 
-def ensure_initialized():
-    """Ensure the server is initialized"""
-    global gdb_controller, session_state, pwndbg_tools
-    
-    if pwndbg_tools is None:
-        logger.info("Initializing Pwno MCP server...")
-        
-        # Create instances
-        gdb_controller = GdbController()
-        session_state = SessionState()
-        pwndbg_tools = PwndbgTools(gdb_controller, session_state)
-        
-        # Initialize GDB with pwndbg
-        init_result = gdb_controller.initialize()
-        logger.info(f"GDB initialization: {init_result['status']}")
-        
-        logger.info("Pwno MCP server initialized successfully")
-
-
-@mcp.tool()
-def execute(command: str) -> str:
-    """
-    Execute arbitrary GDB/pwndbg command
-    
-    Args:
-        command: GDB command to execute
-        
-    Returns:
-        Command output and state information
-    """
-    ensure_initialized()
-    result = pwndbg_tools.execute(command)
-    return format_execute_result(result)
-
-
-@mcp.tool()
-def launch(
-    binary_path: str, 
-    args: str = "", 
-    mode: str = "run"
-) -> str:
-    """
-    Launch binary for debugging with execution control
-    
-    Args:
-        binary_path: Path to binary to debug
-        args: Arguments to pass to the binary
-        mode: Launch mode - 'run' (start fresh) or 'start' (break at entry)
-        
-    Returns:
-        Launch results and initial state
-    """
-    ensure_initialized()
-    result = pwndbg_tools.launch(binary_path, args, mode)
-    return format_launch_result(result)
-
-
-@mcp.tool()
-def step_control(command: str) -> str:
-    """
-    Execute stepping commands (run, c, n, s, ni, si)
-    
-    Args:
-        command: Stepping command - one of: run, c, continue, n, next, s, step, ni, nexti, si, stepi
-        
-    Returns:
-        Execution results and new state
-    """
-    ensure_initialized()
-    result = pwndbg_tools.step_control(command)
-    return format_step_result(result)
-
-
-@mcp.tool()
-def get_context(context_type: str = "all") -> str:
-    """
-    Get debugging context (registers, stack, disassembly, etc.)
-    
-    Args:
-        context_type: Type of context - one of: all, regs, stack, disasm, code, backtrace
-        
-    Returns:
-        Requested context information
-    """
-    ensure_initialized()
-    result = pwndbg_tools.get_context(context_type)
-    return format_context_result(result)
-
-
-@mcp.tool()
-def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
-    """
-    Set a breakpoint at specified location
-    
-    Args:
-        location: Address or symbol for breakpoint
-        condition: Optional breakpoint condition
-        
-    Returns:
-        Breakpoint information
-    """
-    ensure_initialized()
-    result = pwndbg_tools.set_breakpoint(location, condition)
-    return format_breakpoint_result(result)
-
-
-@mcp.tool()
-def get_memory(
-    address: str, 
-    size: int = 64, 
-    format: str = "hex"
-) -> str:
-    """
-    Read memory at specified address
-    
-    Args:
-        address: Memory address to read
-        size: Number of bytes to read
-        format: Output format - one of: hex, string, int
-        
-    Returns:
-        Memory contents in requested format
-    """
-    ensure_initialized()
-    result = pwndbg_tools.get_memory(address, size, format)
-    return format_memory_result(result)
-
-
-@mcp.tool()
-def get_session_info() -> str:
-    """
-    Get current debugging session information
-    
-    Returns:
-        Session state and debugging artifacts
-    """
-    ensure_initialized()
-    result = pwndbg_tools.get_session_info()
-    return format_session_result(result)
-
-
 # Result formatting functions
 def format_execute_result(result: Dict[str, Any]) -> str:
     """Format execute command result"""
@@ -263,11 +122,109 @@ def format_session_result(result: Dict[str, Any]) -> str:
     return json.dumps(result, indent=2)
 
 
+@mcp.tool()
+def execute(command: str) -> str:
+    """
+    Execute arbitrary GDB/pwndbg command.
+
+    :param command: GDB command to execute
+    :returns: Command output and state information
+    """
+    result = pwndbg_tools.execute(command)
+    return format_execute_result(result)
+
+
+@mcp.tool()
+def launch(
+    binary_path: str, 
+    args: str = "", 
+    mode: str = "run"
+) -> str:
+    """
+    Launch binary for debugging with execution control.
+
+    :param binary_path: Path to binary to debug
+    :param args: Arguments to pass to the binary
+    :param mode: Launch mode ('run' to start fresh or 'start' to break at entry)
+    :returns: Launch results and initial state
+    """
+    result = pwndbg_tools.launch(binary_path, args, mode)
+    return format_launch_result(result)
+
+
+@mcp.tool()
+def step_control(command: str) -> str:
+    """
+    Execute stepping commands (run, continue, next, step, nexti, stepi).
+
+    :param command: Stepping command (run, c, n, s, ni, si or full name)
+    :returns: Execution results and new state
+    """
+    result = pwndbg_tools.step_control(command)
+    return format_step_result(result)
+
+
+@mcp.tool()
+def get_context(context_type: str = "all") -> str:
+    """
+    Get debugging context (registers, stack, disassembly, code, backtrace).
+
+    :param context_type: Type of context (all, regs, stack, disasm, code, backtrace)
+    :returns: Requested context information
+    """
+    result = pwndbg_tools.get_context(context_type)
+    return format_context_result(result)
+
+
+@mcp.tool()
+def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
+    """
+    Set a breakpoint at the specified location.
+
+    :param location: Address or symbol for breakpoint
+    :param condition: Optional breakpoint condition
+    :returns: Breakpoint information
+    """
+    result = pwndbg_tools.set_breakpoint(location, condition)
+    return format_breakpoint_result(result)
+
+
+@mcp.tool()
+def get_memory(
+    address: str, 
+    size: int = 64, 
+    format: str = "hex"
+) -> str:
+    """
+    Read memory at the specified address.
+
+    :param address: Memory address to read
+    :param size: Number of bytes to read
+    :param format: Output format (hex, string, int)
+    :returns: Memory contents in the requested format
+    """
+    result = pwndbg_tools.get_memory(address, size, format)
+    return format_memory_result(result)
+
+
+@mcp.tool()
+def get_session_info() -> str:
+    """
+    Get current debugging session information.
+
+    :returns: Session state and debugging artifacts
+    """
+    result = pwndbg_tools.get_session_info()
+    return format_session_result(result)
+
+
 # Run the server
 def run_server():
-    """Run the FastMCP server"""
-    # Ensure tools and GDB are initialized
-    ensure_initialized()
+    """
+    Run the FastMCP server.
+
+    :returns: None
+    """
     try:
         # Check if there's a running event loop
         loop = asyncio.get_running_loop()
