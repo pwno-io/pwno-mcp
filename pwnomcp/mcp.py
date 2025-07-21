@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from pwnomcp.utils.format import *
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
-from pwnomcp.tools import PwndbgTools, SubprocessTools
+from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,6 +26,7 @@ gdb_controller: Optional[GdbController] = None
 session_state: Optional[SessionState] = None
 pwndbg_tools: Optional[PwndbgTools] = None
 subprocess_tools: Optional[SubprocessTools] = None
+git_tools: Optional[GitTools] = None
 
 
 @asynccontextmanager
@@ -36,7 +37,7 @@ async def lifespan(app: FastMCP):
     :param app: FastMCP application instance
     :yields: None
     """
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools
     
     logger.info("Initializing Pwno MCP server...")
     
@@ -45,6 +46,7 @@ async def lifespan(app: FastMCP):
     session_state = SessionState()
     pwndbg_tools = PwndbgTools(gdb_controller, session_state)
     subprocess_tools = SubprocessTools()
+    git_tools = GitTools()
     
     # Initialize GDB with pwndbg
     init_result = gdb_controller.initialize()
@@ -241,6 +243,28 @@ def list_processes() -> str:
     :returns: List of running background processes
     """
     result = subprocess_tools.list_processes()
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def fetch_repo(
+    repo_url: str,
+    version: Optional[str] = None,
+    target_dir: Optional[str] = None,
+    shallow: bool = True
+) -> str:
+    """
+    Fetch a specific version of a git repository.
+    
+    Useful for analyzing vulnerable versions of software or specific commits.
+
+    :param repo_url: Git repository URL (https or ssh)
+    :param version: Specific version to checkout (branch/tag/commit). If None, uses default branch
+    :param target_dir: Target directory name. If None, derives from repo URL
+    :param shallow: Whether to perform shallow clone (faster for large repos)
+    :returns: Repository fetch results including local path
+    """
+    result = git_tools.fetch_repo(repo_url, version, target_dir, shallow)
     return json.dumps(result, indent=2)
 
 
