@@ -1,43 +1,64 @@
-FROM ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:24.04 AS base
 
-# Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
 RUN apt-get update && apt-get install -y \
-    gdb \
+    # Basic tools
+    curl \
+    wget \
+    git \
+    vim \
+    file \
+    # Python and pip
     python3 \
     python3-pip \
     python3-dev \
-    git \
-    wget \
-    vim \
-    file \
+    python3-venv \
+    # GDB and debugging tools
+    gdb \
+    strace \
+    ltrace \
+    # Build tools
+    build-essential \
+    gcc \
+    g++ \
+    clang \
+    make \
+    cmake \
+    # Libraries for ASAN and other sanitizers
+    libasan8 \
+    libubsan1 \
+    liblsan0 \
+    libtsan2 \
+    netcat-openbsd \
+    socat \
+    psmisc \
+    procps \
+    tmux \
+    gdbserver \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pwndbg
-RUN git clone https://github.com/pwndbg/pwndbg /opt/pwndbg && \
-    cd /opt/pwndbg && \
-    ./setup.sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Set working directory
+RUN curl -qsL 'https://install.pwndbg.re' | sh -s -- -t pwndbg-gdb
+
 WORKDIR /app
 
-# Copy the pwno-mcp package
-COPY . /app
+COPY pyproject.toml uv.lock ./
+COPY README.md ./
+COPY pwnomcp ./pwnomcp
 
-# Install pwno-mcp
-RUN pip3 install -e .
+RUN uv sync
 
-# Create a non-root user for running the server
-RUN useradd -m -s /bin/bash pwno
+RUN useradd -m -s /bin/bash pwno && \
+    chown -R pwno:pwno /app
+
 USER pwno
 
-# Copy gdbinit to the pwno user's home
-RUN cp /root/.gdbinit /home/pwno/.gdbinit || echo "source /opt/pwndbg/gdbinit.py" > /home/pwno/.gdbinit
+ENV PYTHONPATH=/app
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 
-# Expose MCP server (runs on stdio, so no port needed)
-# If WebSocket support is added later, expose the port here
+WORKDIR /workspace
 
-# Run the MCP server
-CMD ["python3", "-m", "pwnomcp"] 
+CMD ["uv", "run", "python", "-m", "pwnomcp"] 

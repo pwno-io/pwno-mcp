@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  pwno-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platform: linux/amd64
+    image: pwno-mcp:latest
+    container_name: pwno-mcp-server
+    
+    # Required for GDB to work properly
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    
+    # Security options
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    
+    # Environment variables
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RUST_LOG=info
+      - FASTMCP_DEBUG=false
+      - FASTMCP_LOG_LEVEL=INFO
+    
+    # Volumes for persistent data and workspace
+    volumes:
+      - ./workspace:/workspace:rw
+      - ./binaries:/binaries:ro
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 1G
+    
+    # Working directory
+    working_dir: /workspace
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Stdin/tty for MCP stdio transport
+    stdin_open: true
+    tty: true
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "pwnomcp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 

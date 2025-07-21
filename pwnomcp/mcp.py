@@ -6,14 +6,15 @@ Provides GDB/pwndbg functionality via MCP tools for LLM interaction.
 """
 
 import logging
-from typing import Dict, Any, Optional
+import json
+from typing import Optional
 from mcp.server.fastmcp import FastMCP
 from contextlib import asynccontextmanager
-from pwnomcp.utils.format import *
 
+from pwnomcp.utils.format import *
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
-from pwnomcp.tools import PwndbgTools
+from pwnomcp.tools import PwndbgTools, SubprocessTools
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 gdb_controller: Optional[GdbController] = None
 session_state: Optional[SessionState] = None
 pwndbg_tools: Optional[PwndbgTools] = None
+subprocess_tools: Optional[SubprocessTools] = None
 
 
 @asynccontextmanager
@@ -34,7 +36,7 @@ async def lifespan(app: FastMCP):
     :param app: FastMCP application instance
     :yields: None
     """
-    global gdb_controller, session_state, pwndbg_tools
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools
     
     logger.info("Initializing Pwno MCP server...")
     
@@ -42,6 +44,7 @@ async def lifespan(app: FastMCP):
     gdb_controller = GdbController()
     session_state = SessionState()
     pwndbg_tools = PwndbgTools(gdb_controller, session_state)
+    subprocess_tools = SubprocessTools()
     
     # Initialize GDB with pwndbg
     init_result = gdb_controller.initialize()
@@ -163,6 +166,80 @@ def get_session_info() -> str:
     """
     result = pwndbg_tools.get_session_info()
     return format_session_result(result)
+
+
+@mcp.tool()
+def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) -> str:
+    """
+    Execute a system command and wait for completion.
+    
+    Primarily for compilation with sanitizers like:
+    - gcc -g -fsanitize=address program.c -o program
+    - clang -O0 -g -fno-omit-frame-pointer vuln.c
+    - make clean && make
+
+    :param command: Command to execute
+    :param cwd: Working directory (optional)
+    :param timeout: Timeout in seconds (default: 30)
+    :returns: Command execution results
+    """
+    result = subprocess_tools.run_command(command, cwd=cwd, timeout=timeout)
+    import json
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def spawn_process(command: str, cwd: Optional[str] = None) -> str:
+    """
+    Spawn a background process and return immediately with PID.
+    
+    Useful for:
+    - Starting servers for exploitation
+    - Running network listeners
+    - Background monitoring scripts
+
+    :param command: Command to execute
+    :param cwd: Working directory (optional)
+    :returns: Process information including PID
+    """
+    result = subprocess_tools.spawn_process(command, cwd=cwd)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def get_process_status(pid: int) -> str:
+    """
+    Get status of a spawned process.
+
+    :param pid: Process ID to check
+    :returns: Process status information
+    """
+    result = subprocess_tools.get_process_status(pid)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def kill_process(pid: int, signal: int = 15) -> str:
+    """
+    Kill a process.
+
+    :param pid: Process ID to kill
+    :param signal: Signal to send (15=SIGTERM, 9=SIGKILL)
+    :returns: Kill operation result
+    """
+    result = subprocess_tools.kill_process(pid, signal)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def list_processes() -> str:
+    """
+    List all tracked background processes.
+
+    :returns: List of running background processes
+    """
+    result = subprocess_tools.list_processes()
+    return json.dumps(result, indent=2)
 
 
 def run_server():

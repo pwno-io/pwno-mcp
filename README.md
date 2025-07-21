@@ -34,6 +34,10 @@ Pwno MCP is designed to run in containerized environments (K8s) and expose debug
 - **Breakpoint Management**: Set conditional breakpoints
 - **Memory Operations**: Read memory in various formats
 - **Session State**: Track debugging session state and history
+- **Subprocess Tools**: 
+  - Compile binaries with sanitizers (ASAN, MSAN, etc.)
+  - Spawn and manage background processes
+  - Track process status and resource usage
 
 ## Installation
 
@@ -50,6 +54,45 @@ pip install -e .
 ```bash
 pip install pwno-mcp
 ```
+
+### Using Docker
+
+Build and run with Docker:
+
+```bash
+# Build the image
+docker build -t pwno-mcp:latest .
+
+# Run with required capabilities
+docker run -it \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  -v $(pwd)/workspace:/workspace \
+  pwno-mcp:latest
+```
+
+Or use Docker Compose:
+
+```bash
+# Build and run
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Execute commands in the container
+docker-compose exec pwno-mcp bash
+```
+
+The Docker image includes:
+- Ubuntu 24.04 LTS base
+- GDB with pwndbg pre-installed
+- Build tools (gcc, g++, clang, make, cmake)
+- Address sanitizer libraries
+- Python with uv package manager
+- All required dependencies
 
 ## Prerequisites
 
@@ -185,6 +228,63 @@ Get current debugging session information:
 }
 ```
 
+#### 9. Run Command
+Execute system commands (primarily for compilation):
+```json
+{
+  "tool": "run_command",
+  "arguments": {
+    "command": "gcc -g -fsanitize=address vuln.c -o vuln",
+    "cwd": "/path/to/src",
+    "timeout": 30.0
+  }
+}
+```
+
+#### 10. Spawn Process
+Start a background process and get its PID:
+```json
+{
+  "tool": "spawn_process",
+  "arguments": {
+    "command": "python3 -m http.server 8080",
+    "cwd": "/path/to/serve"
+  }
+}
+```
+
+#### 11. Get Process Status
+Check status of a spawned process:
+```json
+{
+  "tool": "get_process_status",
+  "arguments": {
+    "pid": 12345
+  }
+}
+```
+
+#### 12. Kill Process
+Terminate a process:
+```json
+{
+  "tool": "kill_process",
+  "arguments": {
+    "pid": 12345,
+    "signal": 15
+  }
+}
+```
+
+#### 13. List Processes
+List all tracked background processes:
+```json
+{
+  "tool": "list_processes",
+  "arguments": {}
+}
+```
+
 ### Typical Workflow
 
 1. Load a binary:
@@ -209,6 +309,29 @@ Get current debugging session information:
    ```json
    {"tool": "step_control", "arguments": {"command": "n"}}
    {"tool": "get_context", "arguments": {"context_type": "all"}}
+   ```
+
+### Compilation Workflow Example
+
+1. Compile with AddressSanitizer:
+   ```json
+   {"tool": "run_command", "arguments": {"command": "gcc -g -fsanitize=address -fno-omit-frame-pointer vuln.c -o vuln"}}
+   ```
+
+2. Load and debug the compiled binary:
+   ```json
+   {"tool": "set_file", "arguments": {"binary_path": "./vuln"}}
+   {"tool": "set_breakpoint", "arguments": {"location": "main"}}
+   {"tool": "run", "arguments": {"args": ""}}
+   ```
+
+3. If running a server for exploitation:
+   ```json
+   {"tool": "spawn_process", "arguments": {"command": "./vulnerable_server 8080"}}
+   ```
+   Then check its status:
+   ```json
+   {"tool": "get_process_status", "arguments": {"pid": 12345}}
    ```
 
 ## Development
