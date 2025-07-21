@@ -60,6 +60,8 @@ async def lifespan(app: FastMCP):
 
 # Create FastMCP instance with lifespan
 mcp = FastMCP("pwno-mcp", lifespan=lifespan)
+mcp.settings.host = "0.0.0.0"
+mcp.settings.port = 5500
 
 @mcp.tool()
 def execute(command: str) -> str:
@@ -244,7 +246,7 @@ def list_processes() -> str:
 
 def run_server():
     mcp.run(
-        transport="streamable-http"
+        transport="streamable-http",
     )
 
 

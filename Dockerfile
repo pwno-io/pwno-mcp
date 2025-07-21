@@ -35,11 +35,9 @@ RUN apt-get update && apt-get install -y \
     psmisc \
     procps \
     tmux \
-    gdbserver \
-    && rm -rf /var/lib/apt/lists/*
+    gdbserver
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:${PATH}"
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN curl -qsL 'https://install.pwndbg.re' | sh -s -- -t pwndbg-gdb
 
@@ -49,8 +47,6 @@ COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY pwnomcp ./pwnomcp
 
-RUN uv sync
-
 RUN useradd -m -s /bin/bash pwno && \
     chown -R pwno:pwno /app
 
@@ -58,7 +54,6 @@ USER pwno
 
 ENV PYTHONPATH=/app
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
-
-WORKDIR /workspace
+RUN uv sync
 
 CMD ["uv", "run", "python", "-m", "pwnomcp"] 
