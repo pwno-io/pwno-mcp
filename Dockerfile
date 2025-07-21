@@ -56,4 +56,5 @@ ENV PYTHONPATH=/app
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 RUN uv sync
 
+EXPOSE 5500
 CMD ["uv", "run", "python", "-m", "pwnomcp"] 
