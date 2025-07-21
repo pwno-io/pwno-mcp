@@ -24,7 +24,7 @@ class GitTools:
         
         Sets up a workspace directory for cloned repositories.
         """
-        self.workspace_dir = os.path.join(tempfile.gettempdir(), "pwno_git_workspace")
+        self.workspace_dir = os.path.join(tempfile.gettempdir(), "project")
         os.makedirs(self.workspace_dir, exist_ok=True)
         logger.info(f"Git workspace initialized at: {self.workspace_dir}")
         
