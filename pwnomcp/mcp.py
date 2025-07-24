@@ -198,9 +198,9 @@ def spawn_process(command: str, cwd: Optional[str] = None) -> str:
     Spawn a background process and return immediately with PID.
     
     Useful for:
+    - Compiling with sanitizers (e.g., cmake --build .)
     - Starting servers for exploitation
     - Running network listeners
-    - Background monitoring scripts
 
     :param command: Command to execute
     :param cwd: Working directory (optional)
