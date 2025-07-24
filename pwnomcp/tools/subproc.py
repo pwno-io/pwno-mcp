@@ -13,6 +13,7 @@ import shlex
 from typing import Dict, Any, Optional, List
 import psutil
 import os
+import tempfile
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class SubprocessTools:
     
     def __init__(self):
         """Initialize subprocess tools"""
-        self.background_processes: Dict[int, subprocess.Popen] = {}
+        self.background_processes: Dict[int, Dict[str, Any]] = {}
         
     def run_command(self, command: str, cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None, 
                    timeout: Optional[float] = 30.0) -> Dict[str, Any]:
@@ -107,6 +108,11 @@ class SubprocessTools:
             Dictionary with process information including PID
         """
         logger.info(f"Spawning process: {command}")
+        # Create temp files for stdout and stderr
+        stdout_fd, stdout_path = tempfile.mkstemp(prefix='pwno_stdout_', suffix='.log')
+        stderr_fd, stderr_path = tempfile.mkstemp(prefix='pwno_stderr_', suffix='.log')
+        stdout_file = os.fdopen(stdout_fd, 'w+')
+        stderr_file = os.fdopen(stderr_fd, 'w+')
         
         try:
             # Parse command
@@ -117,42 +123,58 @@ class SubprocessTools:
             if env:
                 cmd_env.update(env)
                 
-            # Spawn process
+            # Spawn process with stdout and stderr redirected to files
             process = subprocess.Popen(
                 cmd_parts,
                 cwd=cwd,
                 env=cmd_env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=stdout_file,
+                stderr=stderr_file,
                 text=True
             )
             
-            # Store process reference
-            self.background_processes[process.pid] = process
+            # Store process reference and file paths
+            self.background_processes[process.pid] = {
+                'process': process,
+                'stdout_file': stdout_file,
+                'stderr_file': stderr_file,
+                'stdout_path': stdout_path,
+                'stderr_path': stderr_path,
+                'command': command,
+                'cwd': cwd or os.getcwd()
+            }
             
-            # Check if process started successfully
-            # Give it a moment to potentially fail
+            # Give process a moment to potentially fail
             import time
             time.sleep(0.1)
             
             if process.poll() is not None:
-                # Process already terminated
-                stdout, stderr = process.communicate()
+                # Process already terminated, read outputs
+                stdout_file.flush()
+                stderr_file.flush()
+                with open(stdout_path, 'r') as f:
+                    stdout = f.read()
+                with open(stderr_path, 'r') as f:
+                    stderr = f.read()
                 return {
-                    "success": False,
-                    "command": command,
-                    "error": "Process terminated immediately",
-                    "returncode": process.returncode,
-                    "stdout": stdout,
-                    "stderr": stderr
+                    'success': False,
+                    'command': command,
+                    'error': 'Process terminated immediately',
+                    'returncode': process.returncode,
+                    'stdout': stdout,
+                    'stderr': stderr,
+                    'stdout_path': stdout_path,
+                    'stderr_path': stderr_path
                 }
-                
+            
             return {
-                "success": True,
-                "command": command,
-                "pid": process.pid,
-                "cwd": cwd or os.getcwd(),
-                "status": "running"
+                'success': True,
+                'command': command,
+                'pid': process.pid,
+                'cwd': cwd or os.getcwd(),
+                'status': 'running',
+                'stdout_path': stdout_path,
+                'stderr_path': stderr_path
             }
             
         except Exception as e:
@@ -163,7 +185,7 @@ class SubprocessTools:
                 "error": str(e)
             }
             
-    def get_process_status(self, pid: int) -> Dict[str, Any]:
+    def get_process(self, pid: int) -> Dict[str, Any]:
         """
         Get status of a spawned process
         
@@ -176,30 +198,39 @@ class SubprocessTools:
         try:
             # Check if we're tracking this process
             if pid in self.background_processes:
-                process = self.background_processes[pid]
+                entry = self.background_processes[pid]
+                process = entry['process']
                 poll_result = process.poll()
                 
                 if poll_result is None:
-                    # Still running
+                    # Still running, return status and output paths
                     return {
-                        "success": True,
-                        "pid": pid,
-                        "status": "running",
-                        "cpu_percent": psutil.Process(pid).cpu_percent(),
-                        "memory_info": psutil.Process(pid).memory_info()._asdict()
+                        'success': True,
+                        'pid': pid,
+                        'status': 'running',
+                        'stdout_path': entry['stdout_path'],
+                        'stderr_path': entry['stderr_path'],
+                        'cpu_percent': psutil.Process(pid).cpu_percent(),
+                        'memory_info': psutil.Process(pid).memory_info()._asdict()
                     }
                 else:
-                    # Process finished
-                    stdout, stderr = process.communicate()
+                    # Process finished, read outputs
+                    entry['stdout_file'].close()
+                    entry['stderr_file'].close()
+                    with open(entry['stdout_path'], 'r') as f:
+                        stdout = f.read()
+                    with open(entry['stderr_path'], 'r') as f:
+                        stderr = f.read()
                     del self.background_processes[pid]
-                    
                     return {
-                        "success": True,
-                        "pid": pid,
-                        "status": "terminated",
-                        "returncode": poll_result,
-                        "stdout": stdout,
-                        "stderr": stderr
+                        'success': True,
+                        'pid': pid,
+                        'status': 'terminated',
+                        'returncode': poll_result,
+                        'stdout': stdout,
+                        'stderr': stderr,
+                        'stdout_path': entry['stdout_path'],
+                        'stderr_path': entry['stderr_path']
                     }
             else:
                 # Try to check if process exists anyway
@@ -240,7 +271,7 @@ class SubprocessTools:
         """
         try:
             if pid in self.background_processes:
-                process = self.background_processes[pid]
+                process = self.background_processes[pid]['process']
                 process.terminate() if signal == 15 else process.kill()
                 process.wait(timeout=5)
                 del self.background_processes[pid]
@@ -277,7 +308,8 @@ class SubprocessTools:
         """
         processes = []
         
-        for pid, process in list(self.background_processes.items()):
+        for pid, entry in list(self.background_processes.items()):
+            process = entry['process']
             poll_result = process.poll()
             if poll_result is None:
                 # Still running
@@ -299,6 +331,8 @@ class SubprocessTools:
                     })
             else:
                 # Process terminated, clean up
+                entry['stdout_file'].close()
+                entry['stderr_file'].close()
                 del self.background_processes[pid]
                 
         return {

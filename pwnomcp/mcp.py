@@ -188,7 +188,6 @@ def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) 
     :returns: Command execution results
     """
     result = subprocess_tools.run_command(command, cwd=cwd, timeout=timeout)
-    import json
     return json.dumps(result, indent=2)
 
 
@@ -211,14 +210,14 @@ def spawn_process(command: str, cwd: Optional[str] = None) -> str:
 
 
 @mcp.tool()
-def get_process_status(pid: int) -> str:
+def get_process(pid: int) -> str:
     """
-    Get status of a spawned process.
+    Get status of a spawned process, including stdout and stderr output or paths.
 
     :param pid: Process ID to check
-    :returns: Process status information
+    :returns: Process status and outputs
     """
-    result = subprocess_tools.get_process_status(pid)
+    result = subprocess_tools.get_process(pid)
     return json.dumps(result, indent=2)
 
 
