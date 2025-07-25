@@ -274,7 +274,8 @@ class SubprocessTools:
                 process = self.background_processes[pid]['process']
                 process.terminate() if signal == 15 else process.kill()
                 process.wait(timeout=5)
-                del self.background_processes[pid]
+                # Keep the process entry cached even after kill, so get_process can retrieve outputs
+                # del self.background_processes[pid]
             else:
                 os.kill(pid, signal)
                 
