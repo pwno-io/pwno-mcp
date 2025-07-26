@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from pwnomcp.utils.format import *
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
-from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools
+from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools, PythonTools
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,6 +27,7 @@ session_state: Optional[SessionState] = None
 pwndbg_tools: Optional[PwndbgTools] = None
 subprocess_tools: Optional[SubprocessTools] = None
 git_tools: Optional[GitTools] = None
+python_tools: Optional[PythonTools] = None
 
 
 @asynccontextmanager
@@ -37,7 +38,7 @@ async def lifespan(app: FastMCP):
     :param app: FastMCP application instance
     :yields: None
     """
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools
     
     logger.info("Initializing Pwno MCP server...")
     
@@ -47,6 +48,7 @@ async def lifespan(app: FastMCP):
     pwndbg_tools = PwndbgTools(gdb_controller, session_state)
     subprocess_tools = SubprocessTools()
     git_tools = GitTools()
+    python_tools = PythonTools()
     
     # Initialize GDB with pwndbg
     init_result = gdb_controller.initialize()
@@ -264,6 +266,80 @@ def fetch_repo(
     :returns: Repository fetch results including local path
     """
     result = git_tools.fetch_repo(repo_url, version, target_dir, shallow)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def execute_python_script(
+    script_path: str,
+    args: Optional[str] = None,
+    cwd: Optional[str] = None,
+    timeout: float = 300.0
+) -> str:
+    """
+    Execute a Python script in the shared preconfigured environment.
+    
+    The environment includes: pwntools, requests, cryptography, numpy,
+    ipython, hexdump, pycryptodome.
+
+    :param script_path: Path to the Python script to execute
+    :param args: Space-separated arguments to pass to the script
+    :param cwd: Working directory for script execution
+    :param timeout: Execution timeout in seconds
+    :returns: Execution results with stdout, stderr, and status
+    """
+    args_list = args.split() if args else None
+    result = python_tools.execute_script(script_path, args_list, cwd, timeout)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def execute_python_code(
+    code: str,
+    cwd: Optional[str] = None,
+    timeout: float = 300.0
+) -> str:
+    """
+    Execute Python code directly in the shared environment.
+    
+    Useful for quick scripts or analysis code using preinstalled packages.
+
+    :param code: Python code to execute
+    :param cwd: Working directory for execution
+    :param timeout: Execution timeout in seconds
+    :returns: Execution results
+    """
+    result = python_tools.execute_code(code, cwd, timeout)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def install_python_packages(
+    packages: str,
+    upgrade: bool = False
+) -> str:
+    """
+    Install additional Python packages using UV.
+    
+    UV is significantly faster than pip for package installation.
+
+    :param packages: Space-separated list of packages (e.g., "beautifulsoup4 lxml")
+    :param upgrade: Whether to upgrade existing packages
+    :returns: Installation results
+    """
+    packages_list = packages.split()
+    result = python_tools.install_packages(packages_list, upgrade)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def list_python_packages() -> str:
+    """
+    List installed packages in the shared Python environment.
+
+    :returns: List of installed packages
+    """
+    result = python_tools.get_installed_packages()
     return json.dumps(result, indent=2)
 
 

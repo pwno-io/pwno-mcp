@@ -166,7 +166,7 @@ class SubprocessTools:
                     'stdout_path': stdout_path,
                     'stderr_path': stderr_path
                 }
-            
+                
             return {
                 'success': True,
                 'command': command,
