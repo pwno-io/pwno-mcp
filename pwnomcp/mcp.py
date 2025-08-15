@@ -77,22 +77,6 @@ mcp = FastMCP("pwno-mcp", lifespan=lifespan)
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
 
-
-# Endpoint for listing all tracked processes
-@mcp.app.get("/processes")
-async def list_processes_endpoint() -> Dict[str, Any]:
-    """
-    List all tracked background processes.
-    
-    :returns: List of running processes
-    """
-    global subprocess_tools
-    
-    if not subprocess_tools:
-        raise HTTPException(status_code=503, detail="Subprocess tools not initialized")
-    
-    return subprocess_tools.list_processes()
-
 @mcp.tool()
 def execute(command: str) -> str:
     """
