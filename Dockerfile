@@ -83,5 +83,8 @@ ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 
 RUN uv sync
 
+WORKDIR /app
+
 EXPOSE 5500
-CMD ["uv", "run", "python", "-m", "pwnomcp"] 
+CMD ["bash"] 
+# uv run -m pwnomcp is what you're looking for
