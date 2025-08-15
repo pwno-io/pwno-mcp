@@ -1,29 +1,10 @@
-# Pwno MCP Server
+# `pwno-mcp`
 
-An MCP (Model Context Protocol) server for autonomous low-level security research, providing GDB/pwndbg functionality for LLM interaction.
+MCP Container for Autonomous & Agentic Binary Level Security Research.
 
 ## Overview
 
-Pwno MCP is designed to run in containerized environments (K8s) and expose debugging capabilities through the Model Context Protocol. Each container runs an isolated instance with its own GDB session, making it perfect for parallel security research tasks.
-
-## Architecture
-
-```
-┌─────────────┐     MCP Protocol      ┌──────────────┐
-│ LLM/Client  │ ◄─────────────────────► │ Pwno MCP     │
-└─────────────┘                        │   Server     │
-                                       └──────┬───────┘
-                                              │
-                                       ┌──────▼───────┐
-                                       │ GDB/pwndbg   │
-                                       │  Controller  │
-                                       └──────┬───────┘
-                                              │
-                                       ┌──────▼───────┐
-                                       │   Target     │
-                                       │   Binary     │
-                                       └──────────────┘
-```
+`PwnoMCP` is designed to run in containerized environments (K8s) and expose debugging capabilities through the Model Context Protocol. Each container runs an isolated instance with its own GDB session.
 
 ## Features
 
@@ -381,7 +362,13 @@ pwnomcp/
 
 ## License
 
-MIT License
+This project is licensed under the Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International License (CC BY-NC-ND 4.0).
+
+- Non-commercial use only
+- No derivatives or modifications may be distributed
+- Attribution required
+
+See the `LICENSE` file for the full legal text or visit the license page: https://creativecommons.org/licenses/by-nc-nd/4.0/
 
 ## Contributing
 

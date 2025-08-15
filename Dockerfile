@@ -37,6 +37,25 @@ RUN apt-get update && apt-get install -y \
     tmux \
     gdbserver
 
+RUN dpkg --add-architecture i386
+RUN apt-get -y update && apt-get upgrade -y
+RUN apt-get install -y lib32z1 apt-transport-https \
+    python3 python3-pip python3-venv python3-poetry python3-dev python3-setuptools \
+    libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev libc6-dbg libc6-dbg:i386 libgcc-s1:i386 \
+    vim nano netcat-openbsd openssh-server git unzip curl tmux konsole wget sudo \
+    bison flex build-essential gcc-multilib \
+    qemu-system-x86 qemu-user qemu-user-binfmt \
+    gcc gdb gdbserver gdb-multiarch clang lldb make cmake
+
+RUN apt-get install patchelf
+
+RUN dpkg --add-architecture i386 && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libc6:i386 lib32z1 && \
+    apt-get install -y --no-install-recommends \
+        gdb gdbserver python3 python3-venv libglib2.0-dev libc6-dbg wget && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN curl -qsL 'https://install.pwndbg.re' | sh -s -- -t pwndbg-gdb
@@ -47,13 +66,21 @@ COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY pwnomcp ./pwnomcp
 
+# Create workspace directory for command execution
+RUN mkdir -p /workspace
+
 RUN useradd -m -s /bin/bash pwno && \
-    chown -R pwno:pwno /app
+    chown -R pwno:pwno /app && \
+    chown -R pwno:pwno /workspace
 
 USER pwno
 
+RUN wget https://github.com/io12/pwninit/releases/download/3.3.1/pwninit -O /usr/local/bin/pwninit && \
+    chmod +x /usr/local/bin/pwninit
+
 ENV PYTHONPATH=/app
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+
 RUN uv sync
 
 EXPOSE 5500
