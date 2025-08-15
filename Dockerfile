@@ -73,10 +73,10 @@ RUN useradd -m -s /bin/bash pwno && \
     chown -R pwno:pwno /app && \
     chown -R pwno:pwno /workspace
 
-USER pwno
-
 RUN wget https://github.com/io12/pwninit/releases/download/3.3.1/pwninit -O /usr/local/bin/pwninit && \
     chmod +x /usr/local/bin/pwninit
+
+USER pwno
 
 ENV PYTHONPATH=/app
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
