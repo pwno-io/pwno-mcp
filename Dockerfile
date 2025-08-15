@@ -60,11 +60,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN curl -qsL 'https://install.pwndbg.re' | sh -s -- -t pwndbg-gdb
 
+# Install systemd so the VM can boot it as PID 1 under Ignite
+RUN apt-get update && apt-get install -y systemd systemd-sysv && \
+    ln -sf /lib/systemd/systemd /sbin/init
+
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY pwnomcp ./pwnomcp
+COPY pwnomcp.service /etc/systemd/system/pwnomcp.service
 
 # Create workspace directory for command execution
 RUN mkdir -p /workspace
@@ -76,6 +81,11 @@ RUN useradd -m -s /bin/bash pwno && \
 RUN wget https://github.com/io12/pwninit/releases/download/3.3.1/pwninit -O /usr/local/bin/pwninit && \
     chmod +x /usr/local/bin/pwninit
 
+# Enable pwnomcp systemd service for VM boot (firecrackers)
+RUN mkdir -p /etc/systemd/system/multi-user.target.wants && \
+    chmod 644 /etc/systemd/system/pwnomcp.service && \
+    ln -sf /etc/systemd/system/pwnomcp.service /etc/systemd/system/multi-user.target.wants/pwnomcp.service
+
 USER pwno
 
 ENV PYTHONPATH=/app
@@ -83,8 +93,5 @@ ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 
 RUN uv sync
 
-WORKDIR /app
-
 EXPOSE 5500
-CMD ["bash"] 
-# uv run -m pwnomcp is what you're looking for
+ENTRYPOINT ["uv", "run", "-m", "pwnomcp"] 
