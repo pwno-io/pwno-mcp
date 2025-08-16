@@ -89,7 +89,6 @@ async def lifespan(app: FastAPI):
 mcp = FastMCP("pwno-mcp")
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
-mcp.settings.streamable_http_path = "/"
 
 @nonce.require_auth
 @mcp.tool()
