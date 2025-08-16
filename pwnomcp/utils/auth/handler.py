@@ -11,6 +11,14 @@ class Nonce:
         else:
             logger.info(f"No nonce provided")
     
+    def update_nonce(self, nonce_value: str = None):
+        """Update the nonce value after initialization."""
+        self._local_nonce = nonce_value
+        if self._local_nonce:
+            logger.info(f"Updated nonce value")
+        else:
+            logger.info(f"Cleared nonce value")
+    
     def extract_bearer_token(self, authorization_header: str) -> str:
         if not authorization_header:
             return None

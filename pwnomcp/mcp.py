@@ -25,8 +25,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global nonce handler, will be initialized in run_server
-nonce = None
+# Global nonce handler, initialized with no authentication by default
+nonce = Nonce()
 
 # Default workspace directory for command execution
 DEFAULT_WORKSPACE = "/workspace"
@@ -446,8 +446,8 @@ def list_python_packages() -> str:
 
 
 def run_server(nonce_value: str = None):
-    global nonce
-    nonce = Nonce(nonce_value)
+    if nonce_value:
+        nonce.update_nonce(nonce_value)
     mcp.run(
         transport="streamable-http",
     )
