@@ -81,6 +81,57 @@ mcp = FastMCP("pwno-mcp", lifespan=lifespan)
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
 
+@mcp.tool()
+def health_check() -> str:
+    """
+    Check server health and component status.
+    
+    Returns server status, version information, and the state of key components.
+    This endpoint does not require authentication for monitoring purposes.
+    
+    :returns: Health status information as JSON
+    """
+    health_status = {
+        "status": "healthy",
+        "server": "pwno-mcp",
+        "version": "1.0.0",
+        "components": {
+            "gdb_controller": "initialized" if gdb_controller and gdb_controller.process else "not_initialized",
+            "session_state": "initialized" if session_state else "not_initialized",
+            "pwndbg_tools": "initialized" if pwndbg_tools else "not_initialized",
+            "subprocess_tools": "initialized" if subprocess_tools else "not_initialized",
+            "git_tools": "initialized" if git_tools else "not_initialized",
+            "python_tools": "initialized" if python_tools else "not_initialized"
+        },
+        "workspace": {
+            "path": DEFAULT_WORKSPACE,
+            "exists": os.path.exists(DEFAULT_WORKSPACE)
+        }
+    }
+    
+    if gdb_controller and gdb_controller.process:
+        try:
+            test_result = gdb_controller.send_command("echo health_check", timeout=1.0)
+            if test_result and test_result.get("status") == "success":
+                health_status["components"]["gdb_responsive"] = True
+            else:
+                health_status["components"]["gdb_responsive"] = False
+                health_status["status"] = "degraded"
+        except Exception as e:
+            health_status["components"]["gdb_responsive"] = False
+            health_status["components"]["gdb_error"] = str(e)
+            health_status["status"] = "degraded"
+    
+    if subprocess_tools:
+        try:
+            active_processes = len(subprocess_tools.processes)
+            health_status["active_processes"] = active_processes
+        except:
+            health_status["active_processes"] = 0
+    
+    return json.dumps(health_status, indent=2)
+
+
 @nonce.require_auth
 @mcp.tool()
 def execute(command: str) -> str:
