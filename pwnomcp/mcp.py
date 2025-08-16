@@ -12,6 +12,8 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
+from fastapi import FastAPI
+import uvicorn
 
 from pwnomcp.utils.format import *
 from pwnomcp.gdb import GdbController
@@ -394,14 +396,66 @@ def list_python_packages() -> str:
     return json.dumps(result, indent=2)
 
 
+# Create FastAPI app
+app = FastAPI(lifespan=lambda app: mcp.session_manager.run())
+
+# Health check endpoint (no authentication required)
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint for monitoring.
+    This endpoint does not require authentication.
+    """
+    health_status = {
+        "status": "healthy",
+        "server": "pwno-mcp",
+        "version": "1.0.0",
+        "components": {
+            "gdb_controller": "initialized" if gdb_controller else "not_initialized",
+            "session_state": "initialized" if session_state else "not_initialized",
+            "pwndbg_tools": "initialized" if pwndbg_tools else "not_initialized",
+            "subprocess_tools": "initialized" if subprocess_tools else "not_initialized",
+            "git_tools": "initialized" if git_tools else "not_initialized",
+            "python_tools": "initialized" if python_tools else "not_initialized"
+        },
+        "workspace": {
+            "path": DEFAULT_WORKSPACE,
+            "exists": os.path.exists(DEFAULT_WORKSPACE)
+        },
+        "authentication": {
+            "enabled": nonce._local_nonce is not None
+        }
+    }
+    
+    # Check GDB responsiveness
+    if gdb_controller and gdb_controller.process:
+        try:
+            test_result = gdb_controller.send_command("echo health_check", timeout=1.0)
+            if test_result and test_result.get("status") == "success":
+                health_status["components"]["gdb_responsive"] = True
+            else:
+                health_status["components"]["gdb_responsive"] = False
+                health_status["status"] = "degraded"
+        except Exception as e:
+            health_status["components"]["gdb_responsive"] = False
+            health_status["components"]["gdb_error"] = str(e)
+            health_status["status"] = "degraded"
+    
+    # Check active subprocess count
+    if subprocess_tools:
+        try:
+            active_processes = len(subprocess_tools.processes)
+            health_status["active_processes"] = active_processes
+        except:
+            health_status["active_processes"] = 0
+    
+    return health_status
+
+# Mount MCP app
+app.mount("/mcp", mcp.streamable_http_app())
+
 def run_server():
-    """
-    Run the Pwno MCP server.
-    Authentication is automatically enabled if /app/.nonce file exists.
-    """
-    mcp.run(
-        transport="streamable-http",
-    )
+    uvicorn.run(app, host="0.0.0.0", port=5500)
 
 
 if __name__ == "__main__":
