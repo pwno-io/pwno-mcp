@@ -42,21 +42,26 @@ python_tools: Optional[PythonTools] = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastMCP):
+async def lifespan(app: FastAPI):
     """
     Lifespan context manager for initializing and cleaning up resources.
+    This runs when the FastAPI/uvicorn app starts, not just the MCP portion.
     
-    :param app: FastMCP application instance
+    :param app: FastAPI application instance
     :yields: None
     """
     global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools
     
     logger.info("Initializing Pwno MCP server...")
     
-    # Create default workspace directory if it doesn't exist
+    # Try to create default workspace directory if it doesn't exist
     if not os.path.exists(DEFAULT_WORKSPACE):
-        os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
-        logger.info(f"Created default workspace directory: {DEFAULT_WORKSPACE}")
+        try:
+            os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
+            logger.info(f"Created default workspace directory: {DEFAULT_WORKSPACE}")
+        except OSError as e:
+            logger.warning(f"Could not create workspace directory {DEFAULT_WORKSPACE}: {e}")
+            logger.info("Continuing without default workspace directory")
     
     # Create instances
     gdb_controller = GdbController()
@@ -70,7 +75,9 @@ async def lifespan(app: FastMCP):
     init_result = gdb_controller.initialize()
     logger.info(f"GDB initialization: {init_result['status']}")
     
-    yield  # Server runs here
+    # Run MCP session manager
+    async with mcp.session_manager.run():
+        yield  # Server runs here
     
     # Cleanup on shutdown
     logger.info("Shutting down Pwno MCP server...")
@@ -78,10 +85,11 @@ async def lifespan(app: FastMCP):
         gdb_controller.close()
 
 
-# Create FastMCP instance with lifespan
-mcp = FastMCP("pwno-mcp", lifespan=lifespan)
+# Create FastMCP instance without lifespan (will be handled by FastAPI)
+mcp = FastMCP("pwno-mcp")
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
+mcp.settings.streamable_http_path = "/"
 
 @nonce.require_auth
 @mcp.tool()
@@ -396,10 +404,15 @@ def list_python_packages() -> str:
     return json.dumps(result, indent=2)
 
 
-# Create FastAPI app
-app = FastAPI(lifespan=lambda app: mcp.session_manager.run())
+# Create FastAPI app with proper lifespan
+app = FastAPI(lifespan=lifespan)
 
 # Health check endpoint (no authentication required)
+
+@app.get("/")
+async def root():
+    return {"message": "Pwno MCP Server"}
+
 @app.get("/health")
 async def health_check():
     """
@@ -410,14 +423,6 @@ async def health_check():
         "status": "healthy",
         "server": "pwno-mcp",
         "version": "1.0.0",
-        "components": {
-            "gdb_controller": "initialized" if gdb_controller else "not_initialized",
-            "session_state": "initialized" if session_state else "not_initialized",
-            "pwndbg_tools": "initialized" if pwndbg_tools else "not_initialized",
-            "subprocess_tools": "initialized" if subprocess_tools else "not_initialized",
-            "git_tools": "initialized" if git_tools else "not_initialized",
-            "python_tools": "initialized" if python_tools else "not_initialized"
-        },
         "workspace": {
             "path": DEFAULT_WORKSPACE,
             "exists": os.path.exists(DEFAULT_WORKSPACE)
@@ -452,7 +457,7 @@ async def health_check():
     return health_status
 
 # Mount MCP app
-app.mount("/mcp", mcp.streamable_http_app())
+app.mount("/", mcp.streamable_http_app())
 
 def run_server():
     uvicorn.run(app, host="0.0.0.0", port=5500)
