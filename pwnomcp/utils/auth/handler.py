@@ -4,20 +4,29 @@ from pathlib import Path
 from pwnomcp.logger import logger
 
 class Nonce:
-    def __init__(self, nonce_value: str = None):
-        self._local_nonce = nonce_value
-        if self._local_nonce:
-            logger.info(f"Initialized with provided nonce")
-        else:
-            logger.info(f"No nonce provided")
+    def __init__(self):
+        self.nonce_file_path = "/app/.nonce"
+        self._local_nonce = None
+        self._load_local_nonce()
     
-    def update_nonce(self, nonce_value: str = None):
-        """Update the nonce value after initialization."""
-        self._local_nonce = nonce_value
-        if self._local_nonce:
-            logger.info(f"Updated nonce value")
-        else:
-            logger.info(f"Cleared nonce value")
+    def _load_local_nonce(self):
+        try:
+            nonce_file = Path(self.nonce_file_path)
+            if nonce_file.exists() and nonce_file.is_file():
+                with open(nonce_file, 'r') as f:
+                    nonce_content = f.read().strip()
+                    if nonce_content:
+                        self._local_nonce = nonce_content
+                        logger.info(f"Loaded nonce from {self.nonce_file_path}, authentication enabled")
+                    else:
+                        logger.warning(f"Nonce file {self.nonce_file_path} is empty, authentication disabled")
+                        self._local_nonce = None
+            else:
+                logger.info(f"Nonce file {self.nonce_file_path} not found, authentication disabled")
+                self._local_nonce = None
+        except Exception as e:
+            logger.error(f"Error loading nonce: {e}, authentication disabled")
+            self._local_nonce = None
     
     def extract_bearer_token(self, authorization_header: str) -> str:
         if not authorization_header:
