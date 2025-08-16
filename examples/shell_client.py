@@ -47,3 +47,6 @@ if __name__ == "__main__":
     execute_command("echo '#include <stdio.h>\nint main() { printf(\"Hello C!\\n\"); return 0; }' > hello.c")
     execute_command("gcc -o hello hello.c")
     print(execute_command("./hello"))
+
+
+

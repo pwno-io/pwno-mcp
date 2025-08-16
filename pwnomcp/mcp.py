@@ -17,12 +17,16 @@ from pwnomcp.utils.format import *
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
 from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools, PythonTools
+from pwnomcp.utils.auth.handler import Nonce
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Global nonce handler, will be initialized in run_server
+nonce = None
 
 # Default workspace directory for command execution
 DEFAULT_WORKSPACE = "/workspace"
@@ -77,6 +81,7 @@ mcp = FastMCP("pwno-mcp", lifespan=lifespan)
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
 
+@nonce.require_auth
 @mcp.tool()
 def execute(command: str) -> str:
     """
@@ -89,6 +94,7 @@ def execute(command: str) -> str:
     return format_execute_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def set_file(binary_path: str) -> str:
     """
@@ -101,6 +107,7 @@ def set_file(binary_path: str) -> str:
     return format_file_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
     """
@@ -118,6 +125,7 @@ def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
     return format_step_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def step_control(command: str) -> str:
     """
@@ -130,6 +138,7 @@ def step_control(command: str) -> str:
     return format_step_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def get_context(context_type: str = "all") -> str:
     """
@@ -142,6 +151,7 @@ def get_context(context_type: str = "all") -> str:
     return format_context_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
     """
@@ -155,6 +165,7 @@ def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
     return format_breakpoint_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def get_memory(
     address: str, 
@@ -173,6 +184,7 @@ def get_memory(
     return format_memory_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def get_session_info() -> str:
     """
@@ -184,6 +196,7 @@ def get_session_info() -> str:
     return format_session_result(result)
 
 
+@nonce.require_auth
 @mcp.tool()
 def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) -> str:
     """
@@ -206,6 +219,7 @@ def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) 
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def spawn_process(command: str, cwd: Optional[str] = None) -> str:
     """
@@ -227,6 +241,7 @@ def spawn_process(command: str, cwd: Optional[str] = None) -> str:
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def get_process(pid: int) -> str:
     """
@@ -252,6 +267,7 @@ def kill_process(pid: int, signal: int = 15) -> str:
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def list_processes() -> str:
     """
@@ -263,6 +279,7 @@ def list_processes() -> str:
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def fetch_repo(
     repo_url: str,
@@ -293,6 +310,7 @@ def fetch_repo(
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def execute_python_script(
     script_path: str,
@@ -320,6 +338,7 @@ def execute_python_script(
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def execute_python_code(
     code: str,
@@ -343,6 +362,7 @@ def execute_python_code(
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def install_python_packages(
     packages: str,
@@ -362,6 +382,7 @@ def install_python_packages(
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
 @mcp.tool()
 def list_python_packages() -> str:
     """
@@ -373,11 +394,18 @@ def list_python_packages() -> str:
     return json.dumps(result, indent=2)
 
 
-def run_server():
+def run_server(nonce_value: str = None):
+    global nonce
+    nonce = Nonce(nonce_value)
     mcp.run(
         transport="streamable-http",
     )
 
 
 if __name__ == "__main__":
-    run_server() 
+    import argparse
+    parser = argparse.ArgumentParser(description="Pwno MCP Server")
+    parser.add_argument("--nonce", type=str, help="nonce", default=None)
+    args = parser.parse_args()
+    
+    run_server(args.nonce) 

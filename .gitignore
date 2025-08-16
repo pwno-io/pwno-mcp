@@ -9,3 +9,6 @@ wheels/
 # Virtual environments
 .venv
 .gdb*
+
+# This isn't actually reference here, just for development
+.nonce

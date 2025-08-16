@@ -94,4 +94,5 @@ ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 RUN uv sync
 
 EXPOSE 5500
-ENTRYPOINT ["uv", "run", "-m", "pwnomcp"] 
+ENTRYPOINT ["/bin/bash"] 
+# You might be looking for: ["uv", "run", "-m", "pwnomcp"] 

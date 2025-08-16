@@ -12,6 +12,7 @@ dependencies = [
     "mcp",
     "pygdbmi>=0.11.0.0",
     "psutil>=5.9.0",
+    "rich>=14.1.0",
 ]
 
 [project.optional-dependencies]
