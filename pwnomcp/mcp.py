@@ -10,6 +10,7 @@ import json
 import os
 from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
+from mcp.server.auth.middleware.auth_context import get_access_token
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from fastapi import FastAPI
@@ -19,7 +20,7 @@ from pwnomcp.utils.format import *
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
 from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools, PythonTools
-from pwnomcp.utils.auth.handler import Nonce
+from pwnomcp.utils.auth.handler import NonceAuthProvider, create_auth_settings
 from pwnomcp.retdec.retdec import RetDecAnalyzer
 
 logging.basicConfig(
@@ -28,8 +29,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Global nonce handler, initialized with no authentication by default
-nonce = Nonce()
+# Initialize authentication provider
+auth_provider = NonceAuthProvider()
+auth_settings = create_auth_settings()
 
 # Default workspace directory for command execution
 DEFAULT_WORKSPACE = "/workspace"
@@ -92,27 +94,32 @@ async def lifespan(app: FastAPI):
         gdb_controller.close()
 
 
-# Create FastMCP instance without lifespan (will be handled by FastAPI)
-mcp = FastMCP("pwno-mcp")
+# Create FastMCP instance with authentication (lifespan handled by FastAPI)
+mcp = FastMCP(
+    name="pwno-mcp",
+    stateless_http=True,
+    auth=auth_settings,
+    auth_server_provider=auth_provider
+)
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
 
-@nonce.require_auth
 @mcp.tool()
-def execute(command: str) -> str:
+async def execute(command: str) -> str:
     """
     Execute arbitrary GDB/pwndbg command.
 
     :param command: GDB command to execute
     :returns: Command output and state information
     """
+    # Access token is available via get_access_token() if needed
+    # token = get_access_token().token if get_access_token() else None
     result = pwndbg_tools.execute(command)
     return format_execute_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def set_file(binary_path: str) -> str:
+async def set_file(binary_path: str) -> str:
     """
     Load a binary file for debugging.
 
@@ -123,9 +130,8 @@ def set_file(binary_path: str) -> str:
     return format_file_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
+async def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
     """
     Run the loaded binary.
     
@@ -141,9 +147,8 @@ def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
     return format_step_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def step_control(command: str) -> str:
+async def step_control(command: str) -> str:
     """
     Execute stepping commands (continue, next, step, nexti, stepi).
 
@@ -154,9 +159,8 @@ def step_control(command: str) -> str:
     return format_step_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def get_context(context_type: str = "all") -> str:
+async def get_context(context_type: str = "all") -> str:
     """
     Get debugging context (registers, stack, disassembly, code, backtrace).
 
@@ -167,9 +171,8 @@ def get_context(context_type: str = "all") -> str:
     return format_context_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
+async def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
     """
     Set a breakpoint at the specified location.
 
@@ -181,9 +184,8 @@ def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
     return format_breakpoint_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def get_memory(
+async def get_memory(
     address: str, 
     size: int = 64, 
     format: str = "hex"
@@ -200,9 +202,8 @@ def get_memory(
     return format_memory_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def get_session_info() -> str:
+async def get_session_info() -> str:
     """
     Get current debugging session information.
 
@@ -212,9 +213,8 @@ def get_session_info() -> str:
     return format_session_result(result)
 
 
-@nonce.require_auth
 @mcp.tool()
-def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) -> str:
+async def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) -> str:
     """
     Execute a system command and wait for completion.
     
@@ -235,9 +235,8 @@ def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) 
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def spawn_process(command: str, cwd: Optional[str] = None) -> str:
+async def spawn_process(command: str, cwd: Optional[str] = None) -> str:
     """
     Spawn a background process and return immediately with PID.
     
@@ -257,9 +256,8 @@ def spawn_process(command: str, cwd: Optional[str] = None) -> str:
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def get_process(pid: int) -> str:
+async def get_process(pid: int) -> str:
     """
     Get status of a spawned process, including stdout and stderr output or paths.
 
@@ -271,7 +269,7 @@ def get_process(pid: int) -> str:
 
 
 @mcp.tool()
-def kill_process(pid: int, signal: int = 15) -> str:
+async def kill_process(pid: int, signal: int = 15) -> str:
     """
     Kill a process.
 
@@ -283,9 +281,8 @@ def kill_process(pid: int, signal: int = 15) -> str:
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def list_processes() -> str:
+async def list_processes() -> str:
     """
     List all tracked background processes.
 
@@ -295,9 +292,8 @@ def list_processes() -> str:
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def fetch_repo(
+async def fetch_repo(
     repo_url: str,
     version: Optional[str] = None,
     target_dir: Optional[str] = None,
@@ -326,9 +322,8 @@ def fetch_repo(
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def execute_python_script(
+async def execute_python_script(
     script_path: str,
     args: Optional[str] = None,
     cwd: Optional[str] = None,
@@ -354,9 +349,8 @@ def execute_python_script(
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def execute_python_code(
+async def execute_python_code(
     code: str,
     cwd: Optional[str] = None,
     timeout: float = 300.0
@@ -378,9 +372,8 @@ def execute_python_code(
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def install_python_packages(
+async def install_python_packages(
     packages: str,
     upgrade: bool = False
 ) -> str:
@@ -398,9 +391,8 @@ def install_python_packages(
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def list_python_packages() -> str:
+async def list_python_packages() -> str:
     """
     List installed packages in the shared Python environment.
 
@@ -410,9 +402,8 @@ def list_python_packages() -> str:
     return json.dumps(result, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def get_retdec_status() -> str:
+async def get_retdec_status() -> str:
     """
     Get the status of RetDec binary analysis.
     
@@ -431,9 +422,8 @@ def get_retdec_status() -> str:
     return json.dumps(status, indent=2)
 
 
-@nonce.require_auth
 @mcp.tool()
-def get_decompiled_code() -> str:
+async def get_decompiled_code() -> str:
     """
     Get the decompiled C code from RetDec analysis.
     
@@ -489,7 +479,7 @@ async def health_check():
             "exists": os.path.exists(DEFAULT_WORKSPACE)
         },
         "authentication": {
-            "enabled": nonce._local_nonce is not None
+            "enabled": auth_provider.is_auth_enabled
         },
         "components": {}
     }
