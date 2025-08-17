@@ -123,15 +123,20 @@ class NonceAuthProvider(OAuthAuthorizationServerProvider):
         return self._local_nonce is not None
 
 
-def create_auth_settings(issuer_url: str = "http://localhost:5500") -> AuthSettings:
+def create_auth_settings(
+    issuer_url: str = "http://localhost:5500",
+    resource_server_url: str = "http://localhost:5500"
+) -> AuthSettings:
     """
     Create MCP auth settings for the Nonce authentication system.
     
     :param issuer_url: URL of the auth issuer (the MCP server itself)
+    :param resource_server_url: URL of the resource server (typically same as issuer)
     :returns: Configured AuthSettings instance
     """
     return AuthSettings(
         issuer_url=AnyHttpUrl(issuer_url),
+        resource_server_url=AnyHttpUrl(resource_server_url),
         client_registration_options=ClientRegistrationOptions(
             enabled=False,  # Disable dynamic client registration
             valid_scopes=["api"],

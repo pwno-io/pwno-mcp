@@ -97,9 +97,8 @@ async def lifespan(app: FastAPI):
 # Create FastMCP instance with authentication (lifespan handled by FastAPI)
 mcp = FastMCP(
     name="pwno-mcp",
-    stateless_http=True,
-    auth=auth_settings,
-    auth_server_provider=auth_provider
+    # auth=auth_settings,
+    # auth_server_provider=auth_provider
 )
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
