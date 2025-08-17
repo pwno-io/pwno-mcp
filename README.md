@@ -20,7 +20,7 @@ MCP Container for Autonomous & Agentic Binary Level Security Research.
   - Spawn and manage background processes
   - Track process status and resource usage
 - **RetDec**: RetDec decompiler service
-  - *note: to use pwno's retdec server, you need to `export BINARY_URL=https://retdec.pwno.io`*
+  - *note: to use pwno's retdec server, you need to `export BINARY_URL=<your-binary-url>`*
 - **Auth**: Authentication via a nonce
 
 ## Installation
