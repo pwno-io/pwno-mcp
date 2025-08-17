@@ -20,6 +20,7 @@ from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
 from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools, PythonTools
 from pwnomcp.utils.auth.handler import Nonce
+from pwnomcp.retdec.retdec import RetDecAnalyzer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,6 +40,7 @@ pwndbg_tools: Optional[PwndbgTools] = None
 subprocess_tools: Optional[SubprocessTools] = None
 git_tools: Optional[GitTools] = None
 python_tools: Optional[PythonTools] = None
+retdec_analyzer: Optional[RetDecAnalyzer] = None
 
 
 @asynccontextmanager
@@ -50,7 +52,7 @@ async def lifespan(app: FastAPI):
     :param app: FastAPI application instance
     :yields: None
     """
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
     
     logger.info("Initializing Pwno MCP server...")
     
@@ -64,16 +66,21 @@ async def lifespan(app: FastAPI):
             logger.info("Continuing without default workspace directory")
     
     # Create instances
-    gdb_controller = GdbController()
-    session_state = SessionState()
-    pwndbg_tools = PwndbgTools(gdb_controller, session_state)
-    subprocess_tools = SubprocessTools()
-    git_tools = GitTools()
-    python_tools = PythonTools()
+    gdb_controller      = GdbController()
+    session_state       = SessionState()
+    pwndbg_tools        = PwndbgTools(gdb_controller, session_state)
+    subprocess_tools    = SubprocessTools()
+    git_tools           = GitTools()
+    python_tools        = PythonTools()
+    retdec_analyzer     = RetDecAnalyzer()
     
     # Initialize GDB with pwndbg
     init_result = gdb_controller.initialize()
     logger.info(f"GDB initialization: {init_result['status']}")
+    
+    # Initialize RetDec analyzer with BINARY_URL if available
+    retdec_result = await retdec_analyzer.initialize()
+    logger.info(f"RetDec initialization: {retdec_result.get('status', 'unknown')}")
     
     # Run MCP session manager
     async with mcp.session_manager.run():
@@ -403,6 +410,61 @@ def list_python_packages() -> str:
     return json.dumps(result, indent=2)
 
 
+@nonce.require_auth
+@mcp.tool()
+def get_retdec_status() -> str:
+    """
+    Get the status of RetDec binary analysis.
+    
+    Returns information about whether a binary was analyzed at startup
+    and the current analysis status.
+
+    :returns: RetDec analysis status information
+    """
+    if not retdec_analyzer:
+        return json.dumps({
+            "status": "not_initialized",
+            "message": "RetDec analyzer not initialized"
+        }, indent=2)
+    
+    status = retdec_analyzer.get_status()
+    return json.dumps(status, indent=2)
+
+
+@nonce.require_auth
+@mcp.tool()
+def get_decompiled_code() -> str:
+    """
+    Get the decompiled C code from RetDec analysis.
+    
+    Returns the decompiled code if analysis was successful,
+    or an error message if analysis failed or was not performed.
+
+    :returns: Decompiled C code or error information
+    """
+    if not retdec_analyzer:
+        return json.dumps({
+            "status": "error",
+            "message": "RetDec analyzer not initialized"
+        }, indent=2)
+    
+    code = retdec_analyzer.get_decompiled_code()
+    
+    if code:
+        return json.dumps({
+            "status": "success",
+            "decompiled_code": code
+        }, indent=2)
+    else:
+        # Get status to provide more information about why code is not available
+        status = retdec_analyzer.get_status()
+        return json.dumps({
+            "status": "unavailable",
+            "reason": status.get("status"),
+            "details": status
+        }, indent=2)
+
+
 # Create FastAPI app with proper lifespan
 app = FastAPI(lifespan=lifespan)
 
@@ -428,27 +490,24 @@ async def health_check():
         },
         "authentication": {
             "enabled": nonce._local_nonce is not None
-        }
+        },
+        "components": {}
     }
     
     # Check GDB responsiveness
-    if gdb_controller and gdb_controller.process:
+    if gdb_controller:
         try:
-            test_result = gdb_controller.send_command("echo health_check", timeout=1.0)
-            if test_result and test_result.get("status") == "success":
-                health_status["components"]["gdb_responsive"] = True
-            else:
-                health_status["components"]["gdb_responsive"] = False
-                health_status["status"] = "degraded"
+            # Check if GDB controller is initialized
+            health_status["components"]["gdb_initialized"] = gdb_controller._initialized
+            health_status["components"]["gdb_state"] = gdb_controller.get_state()
         except Exception as e:
-            health_status["components"]["gdb_responsive"] = False
             health_status["components"]["gdb_error"] = str(e)
             health_status["status"] = "degraded"
     
     # Check active subprocess count
     if subprocess_tools:
         try:
-            active_processes = len(subprocess_tools.processes)
+            active_processes = len(subprocess_tools.background_processes)
             health_status["active_processes"] = active_processes
         except:
             health_status["active_processes"] = 0

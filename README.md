@@ -15,10 +15,13 @@ MCP Container for Autonomous & Agentic Binary Level Security Research.
 - **Breakpoint Management**: Set conditional breakpoints
 - **Memory Operations**: Read memory in various formats
 - **Session State**: Track debugging session state and history
-- **Subprocess Tools**: 
+- **Subprocess Tools**:
   - Compile binaries with sanitizers (ASAN, MSAN, etc.)
   - Spawn and manage background processes
   - Track process status and resource usage
+- **RetDec**: RetDec decompiler service
+  - *note: to use pwno's retdec server, you need to `export BINARY_URL=https://retdec.pwno.io`*
+- **Auth**: Authentication via a nonce
 
 ## Installation
 

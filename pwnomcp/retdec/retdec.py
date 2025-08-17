@@ -1,4 +1,8 @@
-"""RetDec integration module for binary analysis"""
+"""
+RetDec integration module for binary analysis.
+
+Provides decompilation service integration for a single binary per MCP server session.
+"""
 
 from typing import Dict, Any, Optional
 import os
@@ -7,87 +11,157 @@ import datetime
 
 from pwnomcp.logger import logger
 
-RETDEC_SERVICE_URL = "https://retdec.pwno.io" 
-# hardcoded, feel free to use it:) just not too much
 
-retdec_results: Dict[str, Dict[str, Any]] = {}
-
-async def analyze_binary_if_needed(binaro_id: str, binaro_url: str) -> None:
-    if binaro_id in retdec_results or not binaro_url:
-        return
+class RetDecAnalyzer:
+    """
+    RetDec decompilation service analyzer for single binary analysis.
     
-    logger.info(f"Calling retdec decompile service for binaro {binaro_id}")
+    Initializes at startup with BINARY_URL environment variable and 
+    stores the analysis result for subsequent MCP calls.
+    """
     
-    try:
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            response = await client.post(
-                f"{RETDEC_SERVICE_URL}/decompile",
-                json={"url": binaro_url}
-            )
-            
-            retdec_results[binaro_id] = {
-                "decompiled": response.json() if response.status_code == 200 else {
-                    "error": f"Failed to decompile: {response.text}"
-                },
-                "binaro_url": binaro_url,
+    RETDEC_SERVICE_URL = "https://retdec.pwno.io"
+    
+    def __init__(self):
+        """
+        Initialize the RetDec analyzer.
+        
+        :param None:
+        """
+        self.binary_url: Optional[str] = os.environ.get("BINARY_URL")
+        self.analysis_result: Optional[Dict[str, Any]] = None
+        self._initialized = False
+    
+    async def initialize(self) -> Dict[str, Any]:
+        """
+        Initialize and analyze the binary from BINARY_URL environment variable.
+        
+        :returns: Analysis initialization result
+        """
+        if self._initialized:
+            logger.info("RetDec analyzer already initialized")
+            return self.analysis_result or {"status": "already_initialized"}
+        
+        self._initialized = True
+        
+        if not self.binary_url:
+            logger.info("No BINARY_URL environment variable found, skipping RetDec analysis")
+            self.analysis_result = {
+                "status": "skipped",
+                "message": "No BINARY_URL environment variable provided"
+            }
+            return self.analysis_result
+        
+        # Perform the analysis
+        return await self._analyze_binary()
+    
+    async def _analyze_binary(self) -> Dict[str, Any]:
+        """
+        Analyze the binary using RetDec decompilation service.
+        
+        :returns: Analysis result dictionary
+        """
+        logger.info(f"Calling RetDec decompile service for binary: {self.binary_url}")
+        
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(
+                    f"{self.RETDEC_SERVICE_URL}/decompile",
+                    json={"url": self.binary_url}
+                )
+                
+                if response.status_code == 200:
+                    decompiled_data = response.json()
+                    self.analysis_result = {
+                        "status": "success",
+                        "decompiled": decompiled_data,
+                        "binary_url": self.binary_url,
+                        "analyzed_at": datetime.datetime.utcnow().isoformat()
+                    }
+                    logger.info("RetDec decompilation completed successfully")
+                else:
+                    self.analysis_result = {
+                        "status": "failed",
+                        "error": f"Failed to decompile: HTTP {response.status_code}",
+                        "details": response.text,
+                        "binary_url": self.binary_url,
+                        "analyzed_at": datetime.datetime.utcnow().isoformat()
+                    }
+                    logger.error(f"RetDec decompilation failed: {response.status_code}")
+                    
+        except httpx.TimeoutError:
+            logger.error("RetDec service timeout")
+            self.analysis_result = {
+                "status": "failed",
+                "error": "Decompilation timeout (300s)",
+                "binary_url": self.binary_url,
                 "analyzed_at": datetime.datetime.utcnow().isoformat()
             }
-            
-            logger.info(f"RetDec decompilation completed for binaro {binaro_id}")
-            
-    except httpx.TimeoutError:
-        logger.error(f"RetDec service timeout for binaro {binaro_id}")
-        retdec_results[binaro_id] = {
-            "decompiled": {"error": "Decompilation timeout"},
-            "binaro_url": binaro_url,
-            "analyzed_at": datetime.datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"RetDec service error for binaro {binaro_id}: {e}", exc_info=True)
-        retdec_results[binaro_id] = {
-            "decompiled": {"error": f"Decompilation failed: {str(e)}"},
-            "binaro_url": binaro_url,
-            "analyzed_at": datetime.datetime.utcnow().isoformat()
-        }
-
-
-def get_decompiled_code(binaro_id: str) -> Optional[str]:
-    """Get decompiled code for a binaro if available"""
-    if binaro_id not in retdec_results:
+        except Exception as e:
+            logger.error(f"RetDec service error: {e}", exc_info=True)
+            self.analysis_result = {
+                "status": "failed",
+                "error": f"Decompilation failed: {str(e)}",
+                "binary_url": self.binary_url,
+                "analyzed_at": datetime.datetime.utcnow().isoformat()
+            }
+        
+        return self.analysis_result
+    
+    def get_decompiled_code(self) -> Optional[str]:
+        """
+        Get decompiled code if available.
+        
+        :returns: Decompiled C code or None if not available
+        """
+        if not self.analysis_result:
+            return None
+        
+        if self.analysis_result.get("status") != "success":
+            return None
+        
+        decompiled = self.analysis_result.get("decompiled", {})
+        if decompiled.get("status") == "success":
+            return decompiled.get("decompiled_code", "")
+        
         return None
     
-    result = retdec_results[binaro_id]
-    decompiled = result.get("decompiled", {})
-    
-    if "error" in decompiled:
-        return None
-    
-    if decompiled.get("status") == "success":
-        return decompiled.get("decompiled_code", "")
-    
-    return None
-
-
-def get_analysis_status(binaro_id: str) -> Dict[str, Any]:
-    """Get the analysis status for a binaro"""
-    if binaro_id not in retdec_results:
+    def get_status(self) -> Dict[str, Any]:
+        """
+        Get the current analysis status.
+        
+        :returns: Status dictionary with analysis information
+        """
+        if not self.analysis_result:
+            return {
+                "status": "not_analyzed",
+                "message": "No RetDec decompilation has been performed"
+            }
+        
+        if self.analysis_result.get("status") == "skipped":
+            return {
+                "status": "skipped",
+                "message": self.analysis_result.get("message", "Analysis was skipped")
+            }
+        
+        if self.analysis_result.get("status") == "failed":
+            return {
+                "status": "failed",
+                "error": self.analysis_result.get("error"),
+                "details": self.analysis_result.get("details"),
+                "analyzed_at": self.analysis_result.get("analyzed_at")
+            }
+        
+        if self.analysis_result.get("status") == "success":
+            decompiled = self.analysis_result.get("decompiled", {})
+            return {
+                "status": "success",
+                "analyzed_at": self.analysis_result.get("analyzed_at"),
+                "has_code": bool(decompiled.get("decompiled_code")),
+                "binary_url": self.analysis_result.get("binary_url")
+            }
+        
         return {
-            "status": "not_analyzed",
-            "message": "No RetDec decompilation available yet"
-        }
-    
-    result = retdec_results[binaro_id]
-    decompiled = result.get("decompiled", {})
-    
-    if "error" in decompiled:
-        return {
-            "status": "failed",
-            "error": decompiled["error"],
-            "analyzed_at": result.get("analyzed_at")
-        }
-    
-    return {
-        "status": "success",
-        "analyzed_at": result.get("analyzed_at"),
-        "has_code": bool(decompiled.get("decompiled_code"))
-    } 
+            "status": "unknown",
+            "message": "Analysis status is unknown"
+        } 
