@@ -2,4 +2,4 @@
 
 from .controller import GdbController
 
-__all__ = ["GdbController"] 
+__all__ = ["GdbController"]

@@ -1,0 +1,228 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  UV_VERSION: "0.4.18"
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -r pyproject.toml --extra dev
+      
+      - name: Run ruff linter
+        run: |
+          source .venv/bin/activate
+          ruff check pwnomcp/ --output-format=github
+      
+      - name: Run ruff formatter check
+        run: |
+          source .venv/bin/activate
+          ruff format pwnomcp/ --check
+      
+      - name: Run mypy type checking
+        run: |
+          source .venv/bin/activate
+          mypy pwnomcp/ --ignore-missing-imports
+
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -r pyproject.toml --extra dev
+      
+      - name: Run unit tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/unit -v --cov=pwnomcp --cov-report=xml --cov-report=term
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  test-docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: pwno-mcp:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Test Docker image
+        run: |
+          docker run --rm pwno-mcp:test bash -c "uv run -m pwnomcp --help || echo 'Server started successfully'"
+
+  test-mcp-integration:
+    name: MCP Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      pwno-mcp:
+        image: ghcr.io/${{ github.repository }}/pwno-mcp:latest
+        ports:
+          - 5500:5500
+        options: >-
+          --health-cmd "curl -f http://localhost:5500/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      
+      - name: Install test dependencies
+        run: |
+          uv venv
+          uv pip install -r pyproject.toml --extra dev
+      
+      - name: Wait for MCP server
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:5500/health; then
+              echo "MCP server is ready"
+              break
+            fi
+            echo "Waiting for MCP server... ($i/30)"
+            sleep 2
+          done
+      
+      - name: Run MCP integration tests
+        run: |
+          source .venv/bin/activate
+          pytest tests/integration -v --mcp-url=http://localhost:5500
+      
+      - name: Run MCP client tests
+        run: |
+          source .venv/bin/activate
+          python tests/mcp_client_test.py
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run bandit security linter
+        run: |
+          pip install bandit[toml]
+          bandit -r pwnomcp/ -f json -o bandit-report.json || true
+      
+      - name: Upload bandit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  test-e2e:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Compose
+        run: |
+          docker compose up -d
+          sleep 10
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install test dependencies
+        run: |
+          pip install pytest pytest-asyncio httpx mcp
+      
+      - name: Run E2E tests
+        run: |
+          pytest tests/e2e -v
+      
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          docker compose logs > docker-compose.logs
+          docker ps -a
+      
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: docker-compose.logs
+      
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

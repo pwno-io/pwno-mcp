@@ -5,28 +5,23 @@ FastMCP server for autonomous low-level security research.
 Provides GDB/pwndbg functionality via MCP tools for LLM interaction.
 """
 
-import logging
 import json
+import logging
 import os
-from typing import Optional, Dict, Any
-from mcp.server.fastmcp import FastMCP
-from mcp.server.auth.middleware.auth_context import get_access_token
 from contextlib import asynccontextmanager
-from pydantic import BaseModel
-from fastapi import FastAPI
+
 import uvicorn
+from fastapi import FastAPI
+from mcp.server.fastmcp import FastMCP
 
-from pwnomcp.utils.format import *
 from pwnomcp.gdb import GdbController
-from pwnomcp.state import SessionState
-from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools, PythonTools
-from pwnomcp.utils.auth.handler import NonceAuthProvider, create_auth_settings
 from pwnomcp.retdec.retdec import RetDecAnalyzer
+from pwnomcp.state import SessionState
+from pwnomcp.tools import GitTools, PwndbgTools, PythonTools, SubprocessTools
+from pwnomcp.utils.auth.handler import NonceAuthProvider, create_auth_settings
+from pwnomcp.utils.format import *
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Initialize authentication provider
@@ -36,13 +31,13 @@ auth_settings = create_auth_settings()
 # Default workspace directory for command execution
 DEFAULT_WORKSPACE = "/workspace"
 
-gdb_controller: Optional[GdbController] = None
-session_state: Optional[SessionState] = None
-pwndbg_tools: Optional[PwndbgTools] = None
-subprocess_tools: Optional[SubprocessTools] = None
-git_tools: Optional[GitTools] = None
-python_tools: Optional[PythonTools] = None
-retdec_analyzer: Optional[RetDecAnalyzer] = None
+gdb_controller: GdbController | None = None
+session_state: SessionState | None = None
+pwndbg_tools: PwndbgTools | None = None
+subprocess_tools: SubprocessTools | None = None
+git_tools: GitTools | None = None
+python_tools: PythonTools | None = None
+retdec_analyzer: RetDecAnalyzer | None = None
 
 
 @asynccontextmanager
@@ -50,14 +45,14 @@ async def lifespan(app: FastAPI):
     """
     Lifespan context manager for initializing and cleaning up resources.
     This runs when the FastAPI/uvicorn app starts, not just the MCP portion.
-    
+
     :param app: FastAPI application instance
     :yields: None
     """
     global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
-    
+
     logger.info("Initializing Pwno MCP server...")
-    
+
     # Try to create default workspace directory if it doesn't exist
     if not os.path.exists(DEFAULT_WORKSPACE):
         try:
@@ -66,28 +61,28 @@ async def lifespan(app: FastAPI):
         except OSError as e:
             logger.warning(f"Could not create workspace directory {DEFAULT_WORKSPACE}: {e}")
             logger.info("Continuing without default workspace directory")
-    
+
     # Create instances
-    gdb_controller      = GdbController()
-    session_state       = SessionState()
-    pwndbg_tools        = PwndbgTools(gdb_controller, session_state)
-    subprocess_tools    = SubprocessTools()
-    git_tools           = GitTools()
-    python_tools        = PythonTools()
-    retdec_analyzer     = RetDecAnalyzer()
-    
+    gdb_controller = GdbController()
+    session_state = SessionState()
+    pwndbg_tools = PwndbgTools(gdb_controller, session_state)
+    subprocess_tools = SubprocessTools()
+    git_tools = GitTools()
+    python_tools = PythonTools()
+    retdec_analyzer = RetDecAnalyzer()
+
     # Initialize GDB with pwndbg
     init_result = gdb_controller.initialize()
     logger.info(f"GDB initialization: {init_result['status']}")
-    
+
     # Initialize RetDec analyzer with BINARY_URL if available
     retdec_result = await retdec_analyzer.initialize()
     logger.info(f"RetDec initialization: {retdec_result.get('status', 'unknown')}")
-    
+
     # Run MCP session manager
     async with mcp.session_manager.run():
         yield  # Server runs here
-    
+
     # Cleanup on shutdown
     logger.info("Shutting down Pwno MCP server...")
     if gdb_controller:
@@ -95,14 +90,10 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastMCP instance with authentication (lifespan handled by FastAPI)
-mcp = FastMCP(
-    name="pwno-mcp",
-    stateless_http=True,
-    auth=auth_settings,
-    auth_server_provider=auth_provider
-)
+mcp = FastMCP(name="pwno-mcp", stateless_http=True, auth=auth_settings, auth_server_provider=auth_provider)
 mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
+
 
 @mcp.tool()
 async def execute(command: str) -> str:
@@ -131,10 +122,10 @@ async def set_file(binary_path: str) -> str:
 
 
 @mcp.tool()
-async def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
+async def run(args: str = "", interrupt_after: float | None = None) -> str:
     """
     Run the loaded binary.
-    
+
     Before running, you should either:
     1. Set breakpoints at key locations (recommended), OR
     2. Use interrupt_after to pause execution after N seconds
@@ -172,7 +163,7 @@ async def get_context(context_type: str = "all") -> str:
 
 
 @mcp.tool()
-async def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
+async def set_breakpoint(location: str, condition: str | None = None) -> str:
     """
     Set a breakpoint at the specified location.
 
@@ -185,11 +176,7 @@ async def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
 
 
 @mcp.tool()
-async def get_memory(
-    address: str, 
-    size: int = 64, 
-    format: str = "hex"
-) -> str:
+async def get_memory(address: str, size: int = 64, format: str = "hex") -> str:
     """
     Read memory at the specified address.
 
@@ -214,10 +201,10 @@ async def get_session_info() -> str:
 
 
 @mcp.tool()
-async def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) -> str:
+async def run_command(command: str, cwd: str | None = None, timeout: float = 30.0) -> str:
     """
     Execute a system command and wait for completion.
-    
+
     Primarily for compilation with sanitizers like:
     - gcc -g -fsanitize=address program.c -o program
     - clang -O0 -g -fno-omit-frame-pointer vuln.c
@@ -236,10 +223,10 @@ async def run_command(command: str, cwd: Optional[str] = None, timeout: float = 
 
 
 @mcp.tool()
-async def spawn_process(command: str, cwd: Optional[str] = None) -> str:
+async def spawn_process(command: str, cwd: str | None = None) -> str:
     """
     Spawn a background process and return immediately with PID.
-    
+
     Useful for:
     - Compiling with sanitizers (e.g., `cmake --build .`, `make -j4`)
     - Starting servers for exploitation
@@ -294,14 +281,11 @@ async def list_processes() -> str:
 
 @mcp.tool()
 async def fetch_repo(
-    repo_url: str,
-    version: Optional[str] = None,
-    target_dir: Optional[str] = None,
-    shallow: bool = True
+    repo_url: str, version: str | None = None, target_dir: str | None = None, shallow: bool = True
 ) -> str:
     """
     Fetch a specific version of a git repository.
-    
+
     Useful for analyzing vulnerable versions of software or specific commits.
 
     :param repo_url: Git repository URL (https or ssh)
@@ -315,23 +299,20 @@ async def fetch_repo(
         target_dir = os.path.join(DEFAULT_WORKSPACE, target_dir)
     elif not target_dir:
         # Derive from repo URL and place in workspace
-        repo_name = repo_url.rstrip('/').split('/')[-1].replace('.git', '')
+        repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
         target_dir = os.path.join(DEFAULT_WORKSPACE, repo_name)
-    
+
     result = git_tools.fetch_repo(repo_url, version, target_dir, shallow)
     return json.dumps(result, indent=2)
 
 
 @mcp.tool()
 async def execute_python_script(
-    script_path: str,
-    args: Optional[str] = None,
-    cwd: Optional[str] = None,
-    timeout: float = 300.0
+    script_path: str, args: str | None = None, cwd: str | None = None, timeout: float = 300.0
 ) -> str:
     """
     Execute a Python script in the shared preconfigured environment.
-    
+
     The environment includes: pwntools, requests, cryptography, numpy,
     ipython, hexdump, pycryptodome.
 
@@ -350,14 +331,10 @@ async def execute_python_script(
 
 
 @mcp.tool()
-async def execute_python_code(
-    code: str,
-    cwd: Optional[str] = None,
-    timeout: float = 300.0
-) -> str:
+async def execute_python_code(code: str, cwd: str | None = None, timeout: float = 300.0) -> str:
     """
     Execute Python code directly in the shared environment.
-    
+
     Useful for quick scripts or analysis code using preinstalled packages.
 
     :param code: Python code to execute
@@ -373,13 +350,10 @@ async def execute_python_code(
 
 
 @mcp.tool()
-async def install_python_packages(
-    packages: str,
-    upgrade: bool = False
-) -> str:
+async def install_python_packages(packages: str, upgrade: bool = False) -> str:
     """
     Install additional Python packages using UV.
-    
+
     UV is significantly faster than pip for package installation.
 
     :param packages: Space-separated list of packages (e.g., "beautifulsoup4 lxml")
@@ -406,18 +380,15 @@ async def list_python_packages() -> str:
 async def get_retdec_status() -> str:
     """
     Get the status of RetDec binary analysis.
-    
+
     Returns information about whether a binary was analyzed at startup
     and the current analysis status.
 
     :returns: RetDec analysis status information
     """
     if not retdec_analyzer:
-        return json.dumps({
-            "status": "not_initialized",
-            "message": "RetDec analyzer not initialized"
-        }, indent=2)
-    
+        return json.dumps({"status": "not_initialized", "message": "RetDec analyzer not initialized"}, indent=2)
+
     status = retdec_analyzer.get_status()
     return json.dumps(status, indent=2)
 
@@ -426,33 +397,23 @@ async def get_retdec_status() -> str:
 async def get_decompiled_code() -> str:
     """
     Get the decompiled C code from RetDec analysis.
-    
+
     Returns the decompiled code if analysis was successful,
     or an error message if analysis failed or was not performed.
 
     :returns: Decompiled C code or error information
     """
     if not retdec_analyzer:
-        return json.dumps({
-            "status": "error",
-            "message": "RetDec analyzer not initialized"
-        }, indent=2)
-    
+        return json.dumps({"status": "error", "message": "RetDec analyzer not initialized"}, indent=2)
+
     code = retdec_analyzer.get_decompiled_code()
-    
+
     if code:
-        return json.dumps({
-            "status": "success",
-            "decompiled_code": code
-        }, indent=2)
+        return json.dumps({"status": "success", "decompiled_code": code}, indent=2)
     else:
         # Get status to provide more information about why code is not available
         status = retdec_analyzer.get_status()
-        return json.dumps({
-            "status": "unavailable",
-            "reason": status.get("status"),
-            "details": status
-        }, indent=2)
+        return json.dumps({"status": "unavailable", "reason": status.get("status"), "details": status}, indent=2)
 
 
 # Create FastAPI app with proper lifespan
@@ -460,9 +421,11 @@ app = FastAPI(lifespan=lifespan)
 
 # Health check endpoint (no authentication required)
 
+
 @app.get("/")
 async def root():
     return {"message": "Pwno MCP Server"}
+
 
 @app.get("/health")
 async def health_check():
@@ -474,16 +437,11 @@ async def health_check():
         "status": "healthy",
         "server": "pwno-mcp",
         "version": "1.0.0",
-        "workspace": {
-            "path": DEFAULT_WORKSPACE,
-            "exists": os.path.exists(DEFAULT_WORKSPACE)
-        },
-        "authentication": {
-            "enabled": auth_provider.is_auth_enabled
-        },
-        "components": {}
+        "workspace": {"path": DEFAULT_WORKSPACE, "exists": os.path.exists(DEFAULT_WORKSPACE)},
+        "authentication": {"enabled": auth_provider.is_auth_enabled},
+        "components": {},
     }
-    
+
     # Check GDB responsiveness
     if gdb_controller:
         try:
@@ -493,7 +451,7 @@ async def health_check():
         except Exception as e:
             health_status["components"]["gdb_error"] = str(e)
             health_status["status"] = "degraded"
-    
+
     # Check active subprocess count
     if subprocess_tools:
         try:
@@ -501,15 +459,17 @@ async def health_check():
             health_status["active_processes"] = active_processes
         except:
             health_status["active_processes"] = 0
-    
+
     return health_status
+
 
 # Mount MCP app
 app.mount("/", mcp.streamable_http_app())
+
 
 def run_server():
     uvicorn.run(app, host="0.0.0.0", port=5500)
 
 
 if __name__ == "__main__":
-    run_server() 
+    run_server()

@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  pwno-mcp-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pwno-mcp-test
+    ports:
+      - "5500:5500"
+    environment:
+      - DEBUG=1
+      - LOG_LEVEL=DEBUG
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./tests/fixtures:/workspace
+      - /tmp/pwno-test:/tmp
+    command: ["uv", "run", "-m", "pwnomcp"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5500/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pwno-test
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: test-runner
+    depends_on:
+      pwno-mcp-test:
+        condition: service_healthy
+    environment:
+      - MCP_URL=http://pwno-mcp-test:5500
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./tests:/app/tests
+      - ./test-results:/app/test-results
+    command: ["uv", "run", "pytest", "tests/", "-v", "--junit-xml=/app/test-results/junit.xml"]
+    networks:
+      - pwno-test
+
+networks:
+  pwno-test:
+    driver: bridge

@@ -1,52 +1,64 @@
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
+*.egg
 
-# Virtual environments
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.hypothesis/
+test-results/
+*.log
+bandit-report.json
+
+# Development
 .venv/
 venv/
 ENV/
 env/
 .env
+.env.local
 
-# IDE files
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
 
 # Git
 .git/
 .gitignore
+.github/
 
 # Documentation
 docs/
 *.md
 !README.md
 
-# Tests
-tests/
-test_*.py
-*_test.py
+# CI/CD
+.github/
+Makefile
+pytest.ini
+.pre-commit-config.yaml
 
-# Examples
-examples/
-
-# Build artifacts
-build/
-dist/
-*.egg-info/
-.eggs/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Docker files (avoid recursion)
+# Docker
 Dockerfile*
 docker-compose*.yml
-.dockerignore 
+.dockerignore
+
+# Misc
+.mypy_cache/
+.ruff_cache/
+examples/
+scripts/
+tests/fixtures/

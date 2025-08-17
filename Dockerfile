@@ -96,3 +96,4 @@ RUN uv sync
 EXPOSE 5500
 ENTRYPOINT ["/bin/bash"] 
 # You might be looking for: ["uv", "run", "-m", "pwnomcp"] 
+# Firecrackers (Ignite) doesn't support entrypoint rather systemd
