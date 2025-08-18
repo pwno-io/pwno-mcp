@@ -1,7 +1,6 @@
 # `pwno-mcp`
 
-
-MCP-equipped container for autonomous & agentic binary-level security research interactions (for LLMs agents).
+Stateful MCP w/ pre-configured environment for pwn and binary research (designed for LLMs agents).
 
 ## Overview
 
