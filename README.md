@@ -1,6 +1,6 @@
 # `pwno-mcp`
 
-stateful system for `pwn` and binary research, designed for LLMs agents.
+stateful system for autonomous `pwn` and binary research, designed for LLMs agents.
 
 ## Overview
 
