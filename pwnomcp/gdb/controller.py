@@ -260,8 +260,13 @@ class GdbController:
             "state": self._state
         }
         
-    def run(self, args: str = "") -> Dict[str, Any]:
-        """Run the loaded program using MI command"""
+    def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
+        """Run the loaded program using MI command
+
+        :param args: Program arguments to set prior to run
+        :param start: If True, stop at program entry (equivalent to --start)
+        :returns: Structured run result
+        """
         # If arguments were provided, set them for the next run using MI per GDB/MI spec
         # Reference: -exec-arguments (GDB/MI Program Context)
         if args:
@@ -275,11 +280,12 @@ class GdbController:
                 }
 
         # Start execution from the beginning
-        result = self.execute_mi_command("-exec-run")
+        run_command = "-exec-run --start" if start else "-exec-run"
+        result = self.execute_mi_command(run_command)
         
         # Convert MI response to our format
         return {
-            "command": (f"-exec-arguments {args}, -exec-run" if args else "-exec-run"),
+            "command": (f"-exec-arguments {args}, {run_command}" if args else run_command),
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -294,6 +300,18 @@ class GdbController:
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
+        }
+
+    def finish(self) -> Dict[str, Any]:
+        """Finish current function using MI command (-exec-finish)"""
+        result = self.execute_mi_command("-exec-finish")
+
+        return {
+            "command": "-exec-finish",
+            "output": "\n".join(result["output"]) if result["output"] else "",
+            "error": result["error"],
+            "state": self._state,
+            "payload": result.get("payload")
         }
         
     def next(self) -> Dict[str, Any]:
@@ -335,6 +353,41 @@ class GdbController:
         
         return {
             "command": "-exec-step-instruction",
+            "output": "\n".join(result["output"]) if result["output"] else "",
+            "error": result["error"],
+            "state": self._state
+        }
+
+    def jump(self, locspec: str) -> Dict[str, Any]:
+        """Jump to a specific location using MI command (-exec-jump)"""
+        result = self.execute_mi_command(f"-exec-jump {locspec}")
+
+        return {
+            "command": f"-exec-jump {locspec}",
+            "output": "\n".join(result["output"]) if result["output"] else "",
+            "error": result["error"],
+            "state": self._state
+        }
+
+    def return_from_function(self) -> Dict[str, Any]:
+        """Force return from current function using MI command (-exec-return)"""
+        result = self.execute_mi_command("-exec-return")
+
+        return {
+            "command": "-exec-return",
+            "output": "\n".join(result["output"]) if result["output"] else "",
+            "error": result["error"],
+            "state": self._state,
+            "payload": result.get("payload")
+        }
+
+    def until(self, locspec: Optional[str] = None) -> Dict[str, Any]:
+        """Run until a specific location or next line using MI command (-exec-until)"""
+        mi_cmd = "-exec-until" if not locspec else f"-exec-until {locspec}"
+        result = self.execute_mi_command(mi_cmd)
+
+        return {
+            "command": mi_cmd,
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -492,6 +545,28 @@ class GdbController:
                 "error": str(e),
                 "state": self._state
             }
+
+    def interrupt_execution(self, all_threads: bool = False, thread_group: Optional[str] = None) -> Dict[str, Any]:
+        """Interrupt target using MI command (-exec-interrupt)
+
+        :param all_threads: If True, interrupt all threads (non-stop mode)
+        :param thread_group: Optional thread group identifier to interrupt
+        :returns: Structured interrupt result
+        """
+        mi_cmd = "-exec-interrupt"
+        if all_threads:
+            mi_cmd += " --all"
+        elif thread_group:
+            mi_cmd += f" --thread-group {thread_group}"
+
+        result = self.execute_mi_command(mi_cmd)
+
+        return {
+            "command": mi_cmd,
+            "output": "\n".join(result["output"]) if result["output"] else "",
+            "error": result["error"],
+            "state": self._state
+        }
         
     def get_state(self) -> str:
         """Get current inferior state"""

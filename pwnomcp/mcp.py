@@ -129,7 +129,7 @@ async def set_file(binary_path: str) -> str:
 
 
 @mcp.tool()
-async def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
+async def run(args: str = "", interrupt_after: Optional[float] = None, start: bool = False) -> str:
     """
     Run the loaded binary.
     
@@ -139,9 +139,10 @@ async def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
 
     :param args: Arguments to pass to the binary
     :param interrupt_after: Optional - interrupt execution after N seconds
+    :param start: Optional - stop at program entry (equivalent to --start)
     :returns: Execution results and state
     """
-    result = pwndbg_tools.run(args, interrupt_after)
+    result = pwndbg_tools.run(args, interrupt_after, start)
     return format_launch_result(result)
 
 
@@ -154,6 +155,65 @@ async def step_control(command: str) -> str:
     :returns: Execution results and new state
     """
     result = pwndbg_tools.step_control(command)
+    return format_step_result(result)
+
+
+@mcp.tool()
+async def finish() -> str:
+    """
+    Run until the current function returns.
+
+    :returns: Execution results and new state
+    """
+    result = pwndbg_tools.finish()
+    return format_step_result(result)
+
+
+@mcp.tool()
+async def interrupt(all_threads: bool = False, thread_group: Optional[str] = None) -> str:
+    """
+    Interrupt the target's execution.
+
+    :param all_threads: Interrupt all threads (non-stop mode)
+    :param thread_group: Interrupt only the specified thread group
+    :returns: Interrupt results and state
+    """
+    result = pwndbg_tools.interrupt_execution(all_threads=all_threads, thread_group=thread_group)
+    return format_step_result(result)
+
+
+@mcp.tool()
+async def jump(locspec: str) -> str:
+    """
+    Resume execution at the specified location.
+
+    :param locspec: Location specification (e.g., "main", "file.c:123", "*0x401000")
+    :returns: Execution results and state
+    """
+    result = pwndbg_tools.jump(locspec)
+    return format_step_result(result)
+
+
+@mcp.tool()
+async def return_from_function() -> str:
+    """
+    Make the current function return immediately.
+
+    :returns: Execution results and state
+    """
+    result = pwndbg_tools.return_from_function()
+    return format_step_result(result)
+
+
+@mcp.tool()
+async def until(locspec: Optional[str] = None) -> str:
+    """
+    Run until a specified location, or the next source line if none provided.
+
+    :param locspec: Optional location specification (e.g., "file.c:45")
+    :returns: Execution results and state
+    """
+    result = pwndbg_tools.until(locspec)
     return format_step_result(result)
 
 

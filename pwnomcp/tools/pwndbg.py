@@ -81,13 +81,14 @@ class PwndbgTools:
             "state": result["state"]
         }
         
-    def run(self, args: str = "", interrupt_after: Optional[float] = None) -> Dict[str, Any]:
+    def run(self, args: str = "", interrupt_after: Optional[float] = None, start: bool = False) -> Dict[str, Any]:
         """
         Run the loaded binary
         
         Args:
             args: Arguments to pass to the binary
             interrupt_after: Send interrupt signal after specified seconds
+            start: If True, stop at program entry (GDB --start)
             
         Returns:
             Dictionary with execution results
@@ -102,7 +103,7 @@ class PwndbgTools:
             }
             
         # Run the program
-        result = self.gdb.run(args)
+        result = self.gdb.run(args, start=start)
         
         # If interrupt_after is specified and program is running, schedule interrupt
         if interrupt_after and result.get("state") == "running":
@@ -137,6 +138,106 @@ class PwndbgTools:
         return {
             "success": not result.get("error"),
             "output": result["output"],
+            "error": result.get("error"),
+            "state": result["state"],
+            "context": context
+        }
+
+    def finish(self) -> Dict[str, Any]:
+        """Run until current function finishes (-exec-finish)"""
+        logger.info("Finish current function")
+        result = self.gdb.finish()
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", "finish"), result)
+
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+
+        return {
+            "success": not result.get("error"),
+            "command": "finish",
+            "output": result.get("output"),
+            "error": result.get("error"),
+            "state": result["state"],
+            "context": context
+        }
+
+    def interrupt_execution(self, all_threads: bool = False, thread_group: Optional[str] = None) -> Dict[str, Any]:
+        """Interrupt the target using MI (-exec-interrupt)"""
+        logger.info("Interrupt execution via MI")
+        result = self.gdb.interrupt_execution(all_threads=all_threads, thread_group=thread_group)
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", "interrupt"), result)
+
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+
+        return {
+            "success": not result.get("error"),
+            "command": "interrupt",
+            "output": result.get("output"),
+            "error": result.get("error"),
+            "state": result["state"],
+            "context": context
+        }
+
+    def jump(self, locspec: str) -> Dict[str, Any]:
+        """Jump to a specific location (-exec-jump)"""
+        logger.info(f"Jump to {locspec}")
+        result = self.gdb.jump(locspec)
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", f"jump {locspec}"), result)
+
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+
+        return {
+            "success": not result.get("error"),
+            "command": "jump",
+            "output": result.get("output"),
+            "error": result.get("error"),
+            "state": result["state"],
+            "context": context
+        }
+
+    def return_from_function(self) -> Dict[str, Any]:
+        """Force return from current function (-exec-return)"""
+        logger.info("Force return from current function")
+        result = self.gdb.return_from_function()
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", "return"), result)
+
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+
+        return {
+            "success": not result.get("error"),
+            "command": "return",
+            "output": result.get("output"),
+            "error": result.get("error"),
+            "state": result["state"],
+            "context": context
+        }
+
+    def until(self, locspec: Optional[str] = None) -> Dict[str, Any]:
+        """Run until a location or next source line (-exec-until)"""
+        logger.info(f"Until {locspec if locspec else '[next line]'}")
+        result = self.gdb.until(locspec)
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", "until"), result)
+
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+
+        return {
+            "success": not result.get("error"),
+            "command": "until",
+            "output": result.get("output"),
             "error": result.get("error"),
             "state": result["state"],
             "context": context
