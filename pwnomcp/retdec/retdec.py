@@ -158,7 +158,7 @@ class RetDecAnalyzer:
                 "status": "success",
                 "analyzed_at": self.analysis_result.get("analyzed_at"),
                 "has_code": bool(decompiled.get("decompiled_code")),
-                "binary_url": self.analysis_result.get("binary_url")
+                # "binary_url": self.analysis_result.get("binary_url")
             }
         
         return {

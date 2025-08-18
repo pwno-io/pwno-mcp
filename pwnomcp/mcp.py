@@ -142,7 +142,7 @@ async def run(args: str = "", interrupt_after: Optional[float] = None) -> str:
     :returns: Execution results and state
     """
     result = pwndbg_tools.run(args, interrupt_after)
-    return format_step_result(result)
+    return format_launch_result(result)
 
 
 @mcp.tool()

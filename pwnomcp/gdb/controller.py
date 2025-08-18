@@ -10,6 +10,7 @@ import logging
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from pygdbmi import gdbcontroller
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -246,13 +247,14 @@ class GdbController:
         """Load an executable file for debugging using MI command"""
         # Use MI command for better structured response
         result = self.execute_mi_command(f"-file-exec-and-symbols {filepath}")
-        
+        self.execute_mi_command(f"-environment-cd {os.path.dirname(filepath)}")
+
         if result["success"]:
             self._state = "stopped"  # File loaded, ready to run
             
         # Convert MI response to our format
         return {
-            "command": f"file {filepath}",
+            "command": f"-file-exec-and-symbols {filepath}",
             "output": "\n".join(result["output"]) if result["output"] else f"Reading symbols from {filepath}...",
             "error": result["error"],
             "state": self._state
@@ -260,16 +262,24 @@ class GdbController:
         
     def run(self, args: str = "") -> Dict[str, Any]:
         """Run the loaded program using MI command"""
-        # Use MI command
-        mi_command = "-exec-run"
+        # If arguments were provided, set them for the next run using MI per GDB/MI spec
+        # Reference: -exec-arguments (GDB/MI Program Context)
         if args:
-            mi_command += f" {args}"
-            
-        result = self.execute_mi_command(mi_command)
+            set_args_result = self.execute_mi_command(f"-exec-arguments {args}")
+            if not set_args_result["success"]:
+                return {
+                    "command": f"-exec-arguments {args}",
+                    "output": "\n".join(set_args_result["output"]) if set_args_result["output"] else "",
+                    "error": set_args_result["error"] or "Failed to set program arguments",
+                    "state": self._state
+                }
+
+        # Start execution from the beginning
+        result = self.execute_mi_command("-exec-run")
         
         # Convert MI response to our format
         return {
-            "command": f"run {args}",
+            "command": (f"-exec-arguments {args}, -exec-run" if args else "-exec-run"),
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -280,7 +290,7 @@ class GdbController:
         result = self.execute_mi_command("-exec-continue")
         
         return {
-            "command": "continue",
+            "command": "-exec-continue",
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -291,7 +301,7 @@ class GdbController:
         result = self.execute_mi_command("-exec-next")
         
         return {
-            "command": "next",
+            "command": "-exec-next",
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -302,7 +312,7 @@ class GdbController:
         result = self.execute_mi_command("-exec-step")
         
         return {
-            "command": "step",
+            "command": "-exec-step",
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -313,7 +323,7 @@ class GdbController:
         result = self.execute_mi_command("-exec-next-instruction")
         
         return {
-            "command": "nexti",
+            "command": "-exec-next-instruction",
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -324,7 +334,7 @@ class GdbController:
         result = self.execute_mi_command("-exec-step-instruction")
         
         return {
-            "command": "stepi",
+            "command": "-exec-step-instruction",
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state
@@ -356,7 +366,7 @@ class GdbController:
                 output += f" ({file}:{line})"
                 
         return {
-            "command": f"break {location}",
+            "command": mi_command,
             "output": output or "\n".join(result["output"]),
             "error": result["error"],
             "state": self._state,
@@ -372,7 +382,7 @@ class GdbController:
             value = result["payload"].get("value")
             
         return {
-            "command": f"print {expression}",
+            "command": f"-data-evaluate-expression \"{expression}\"",
             "output": value if value else "\n".join(result["output"]),
             "error": result["error"],
             "state": self._state,
@@ -397,7 +407,7 @@ class GdbController:
         result = self.execute_mi_command(mi_command)
         
         return {
-            "command": f"x/{nr_rows*nr_cols}{word_format}b {address}",
+            "command": mi_command,
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state,
@@ -409,7 +419,7 @@ class GdbController:
         result = self.execute_mi_command("-break-list")
         
         return {
-            "command": "info breakpoints",
+            "command": "-break-list",
             "output": "\n".join(result["output"]) if result["output"] else "",
             "error": result["error"],
             "state": self._state,
@@ -421,7 +431,7 @@ class GdbController:
         result = self.execute_mi_command(f"-break-delete {number}")
         
         return {
-            "command": f"delete {number}",
+            "command": f"-break-delete {number}",
             "output": "\n".join(result["output"]) if result["output"] else f"Deleted breakpoint {number}",
             "error": result["error"],
             "state": self._state
@@ -432,7 +442,7 @@ class GdbController:
         result = self.execute_mi_command(f"-break-enable {number}")
         
         return {
-            "command": f"enable {number}",
+            "command": f"-break-enable {number}",
             "output": "\n".join(result["output"]) if result["output"] else f"Enabled breakpoint {number}",
             "error": result["error"],
             "state": self._state
@@ -443,7 +453,7 @@ class GdbController:
         result = self.execute_mi_command(f"-break-disable {number}")
         
         return {
-            "command": f"disable {number}",
+            "command": f"-break-disable {number}",
             "output": "\n".join(result["output"]) if result["output"] else f"Disabled breakpoint {number}",
             "error": result["error"],
             "state": self._state

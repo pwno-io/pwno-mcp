@@ -127,7 +127,7 @@ class PwndbgTools:
         
         # Update session state
         self.session.update_state(result["state"])
-        self.session.record_command(f"run {args}", result)
+        self.session.record_command(result.get("command", f"run {args}"), result)
         
         # Get context if stopped
         context = None
@@ -185,7 +185,7 @@ class PwndbgTools:
             
         # Update session state
         self.session.update_state(result["state"])
-        self.session.record_command(actual_command, result)
+        self.session.record_command(result.get("command", actual_command), result)
         
         # Get context if stopped
         context = None
