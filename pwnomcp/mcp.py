@@ -80,9 +80,8 @@ async def lifespan(app: FastAPI):
     init_result = gdb_controller.initialize()
     logger.info(f"GDB initialization: {init_result['status']}")
     
-    # Initialize RetDec analyzer with BINARY_URL if available
-    retdec_result = await retdec_analyzer.initialize()
-    logger.info(f"RetDec initialization: {retdec_result.get('status', 'unknown')}")
+    # RetDec analyzer will be lazily initialized on first use
+    logger.info("RetDec analyzer created (lazy initialization)")
     
     # Run MCP session manager
     async with mcp.session_manager.run():
@@ -406,8 +405,8 @@ async def get_retdec_status() -> str:
     """
     Get the status of RetDec binary analysis.
     
-    Returns information about whether a binary was analyzed at startup
-    and the current analysis status.
+    Returns information about whether a binary was analyzed.
+    Will automatically initialize analysis on first call if BINARY_URL is set.
 
     :returns: RetDec analysis status information
     """
@@ -416,6 +415,11 @@ async def get_retdec_status() -> str:
             "status": "not_initialized",
             "message": "RetDec analyzer not initialized"
         }, indent=2)
+    
+    # Lazy initialization on first use
+    if not retdec_analyzer._initialized:
+        logger.info("Performing lazy initialization of RetDec analyzer")
+        await retdec_analyzer.initialize()
     
     status = retdec_analyzer.get_status()
     return json.dumps(status, indent=2)
@@ -428,6 +432,7 @@ async def get_decompiled_code() -> str:
     
     Returns the decompiled code if analysis was successful,
     or an error message if analysis failed or was not performed.
+    Will automatically initialize analysis on first call if BINARY_URL is set.
 
     :returns: Decompiled C code or error information
     """
@@ -436,6 +441,11 @@ async def get_decompiled_code() -> str:
             "status": "error",
             "message": "RetDec analyzer not initialized"
         }, indent=2)
+    
+    # Lazy initialization on first use
+    if not retdec_analyzer._initialized:
+        logger.info("Performing lazy initialization of RetDec analyzer")
+        await retdec_analyzer.initialize()
     
     code = retdec_analyzer.get_decompiled_code()
     
