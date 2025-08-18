@@ -15,7 +15,7 @@ stateful system for autonomous `pwn` and binary research, designed for LLMs agen
 **Can I use it?**:
 
 - non-profit: *yes, feel free to*
-- for-profit: contact us at [oss@pwno.ai](mailto:oss@pwno.ai)
+- commercial: [oss@pwno.io](mailto:oss@pwno.io)
 
 ## Features
 
