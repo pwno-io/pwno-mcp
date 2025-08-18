@@ -1,20 +1,21 @@
 # `pwno-mcp`
 
-MCP Container for Autonomous & Agentic Binary Level Security Research.
+MCP equipped container for autonomous & agentic binary-level security research interactions (for LLMs agents).
 
 ## Overview
 
-`PwnoMCP` is designed to run in containerized environments (K8s) and expose debugging capabilities through the Model Context Protocol. Each container runs an isolated instance with its own GDB session.
+`PwnoMCP` is designed to run in scalable containerized environments (k8s) and expose interaction, debugging capabilities through the Model Context Protocol (MCP). Each container runs an isolated instance with its own research self-sufficient environment.
 
 ## Features
 
-- **Execute Tool**: Run arbitrary GDB/pwndbg commands
-- **Launch Tool**: Load and run binaries with full control
-- **Step Control**: Support for all stepping commands (run, c, n, s, ni, si)
-- **Context Retrieval**: Get registers, stack, disassembly, code, and backtrace
-- **Breakpoint Management**: Set conditional breakpoints
-- **Memory Operations**: Read memory in various formats
-- **Session State**: Track debugging session state and history
+- `pwndbg` machine-interface, stateful execution with debugging (designed deliberately toward LLMs)
+  - **Execute Tool**: Run arbitrary GDB/pwndbg commands
+  - **Launch Tool**: Load and run binaries with full control
+  - **Step Control**: Support for all stepping commands (run, c, n, s, ni, si)
+  - **Context Retrieval**: Get registers, stack, disassembly, code, and backtrace
+  - **Breakpoint Management**: Set conditional breakpoints
+  - **Memory Operations**: Read memory in various formats
+  - **Session State**: Track debugging session state and history
 - **Subprocess Tools**:
   - Compile binaries with sanitizers (ASAN, MSAN, etc.)
   - Spawn and manage background processes
