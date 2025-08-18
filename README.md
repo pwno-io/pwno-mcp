@@ -1,6 +1,6 @@
 # `pwno-mcp`
 
-Stateful MCP w/ pre-configured environment for pwn and binary research (designed for LLMs agents).
+stateful system for `pwn` and binary research, designed for LLMs agents.
 
 ## Overview
 
