@@ -79,13 +79,10 @@ async def lifespan(app: FastAPI):
     # Initialize GDB with pwndbg
     init_result = gdb_controller.initialize()
     logger.info(f"GDB initialization: {init_result['status']}")
-    
-    # RetDec analyzer will be lazily initialized on first use
     logger.info("RetDec analyzer created (lazy initialization)")
     
-    # Run MCP session manager
     async with mcp.session_manager.run():
-        yield  # Server runs here
+        yield  
     
     # Cleanup on shutdown
     logger.info("Shutting down Pwno MCP server...")
@@ -126,6 +123,19 @@ async def set_file(binary_path: str) -> str:
     """
     result = pwndbg_tools.set_file(binary_path)
     return format_file_result(result)
+
+
+@mcp.tool()
+async def attach(pid: int) -> str:
+    """
+    Attach to an existing process by PID.
+
+    :param pid: Process ID to attach to
+    :returns: Attach status and initial context if stopped
+    """
+    result = pwndbg_tools.attach(pid)
+    # Reuse step-style formatter to include state and context if present
+    return format_step_result(result)
 
 
 @mcp.tool()
@@ -275,6 +285,7 @@ async def get_session_info() -> str:
 async def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) -> str:
     """
     Execute a system command and wait for completion.
+    **Do not use this to run targeted binaries**
     
     Primarily for compilation with sanitizers like:
     - gcc -g -fsanitize=address program.c -o program
@@ -427,6 +438,33 @@ async def execute_python_code(
     if cwd is None:
         cwd = DEFAULT_WORKSPACE
     result = python_tools.execute_code(code, cwd, timeout)
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def execute_python_code_bg(
+    code: str,
+    cwd: Optional[str] = None
+) -> str:
+    """
+    Execute Python code in the background (decoupled execution).
+
+    This writes the code to a temporary script and spawns it using the
+    shared Python environment. Returns immediately with PID and log paths.
+
+    :param code: Python code to execute
+    :param cwd: Working directory for execution (default: /workspace)
+    :returns: JSON with pid, stdout/stderr file paths, and status
+    """
+    if cwd is None:
+        cwd = DEFAULT_WORKSPACE
+    # Create a temp script and spawn via subprocess tools to unify tracking
+    script_path = python_tools.create_temp_script(code)
+    python_exe = python_tools.get_python_executable()
+    cmd = f"{python_exe} {script_path}"
+    result = subprocess_tools.spawn_process(cmd, cwd=cwd)
+    # Include the temp script path so callers can manage/cleanup if desired
+    result["script_path"] = script_path
     return json.dumps(result, indent=2)
 
 

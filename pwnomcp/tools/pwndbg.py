@@ -80,6 +80,40 @@ class PwndbgTools:
             "error": result.get("error"),
             "state": result["state"]
         }
+
+    def attach(self, pid: int) -> Dict[str, Any]:
+        """
+        Attach to an existing process
+        
+        Args:
+            pid: Process ID to attach to
+        
+        Returns:
+            Dictionary with attach status
+        """
+        logger.info(f"Attach to pid: {pid}")
+
+        result = self.gdb.attach(pid)
+
+        # Update session state if successful
+        if not result.get("error"):
+            self.session.pid = pid
+            self.session.update_state(result["state"]) 
+            self.session.record_command(result.get("command", f"attach {pid}"), result)
+
+        # Get context if stopped
+        context = None
+        if result["state"] == "stopped":
+            context = self._get_full_context()
+
+        return {
+            "success": not result.get("error"),
+            "output": result["output"],
+            "error": result.get("error"),
+            "state": result["state"],
+            "pid": result.get("pid"),
+            "context": context
+        }
         
     def run(self, args: str = "", interrupt_after: Optional[float] = None, start: bool = False) -> Dict[str, Any]:
         """
@@ -111,8 +145,8 @@ class PwndbgTools:
             
             def interrupt_program():
                 logger.info(f"Interrupting program after {interrupt_after} seconds")
-                # Send interrupt signal
-                interrupt_result = self.gdb.interrupt()
+                # Prefer MI interrupt for correctness with mi-async
+                interrupt_result = self.gdb.interrupt_execution(all_threads=False)
                 logger.info(f"Interrupt result: {interrupt_result}")
                 
             # Schedule interrupt

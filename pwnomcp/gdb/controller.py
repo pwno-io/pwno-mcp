@@ -53,6 +53,10 @@ class GdbController:
         # else:
         #     logger.warning("No .gdbinit found")
             
+        # Enable MI asynchronous mode so that execution commands are non-blocking
+        mi_async_set = self.execute_mi_command("set mi-async on")
+        results.append(mi_async_set)
+        
         # Verify pwndbg is loaded
         pwndbg_check = self.execute_command("pwndbg")
         results.append(pwndbg_check)
@@ -258,6 +262,22 @@ class GdbController:
             "output": "\n".join(result["output"]) if result["output"] else f"Reading symbols from {filepath}...",
             "error": result["error"],
             "state": self._state
+        }
+
+    def attach(self, pid: int) -> Dict[str, Any]:
+        """Attach to an existing process using MI command (-target-attach)"""
+        result = self.execute_mi_command(f"-target-attach {pid}")
+
+        if result["success"]:
+            self._inferior_pid = pid
+            self._state = "stopped"
+
+        return {
+            "command": f"-target-attach {pid}",
+            "output": "\n".join(result["output"]) if result["output"] else "",
+            "error": result["error"],
+            "state": self._state,
+            "pid": self._inferior_pid
         }
         
     def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:

@@ -250,4 +250,24 @@ class PythonTools:
                 "success": False,
                 "error": str(e),
                 "type": type(e).__name__
-            } 
+            }
+    
+    def get_python_executable(self) -> str:
+        """
+        Return absolute path to the Python executable in the shared venv.
+        
+        :returns: Path to Python interpreter inside the managed environment
+        """
+        return os.path.join(self.venv_path, "bin", "python")
+    
+    def create_temp_script(self, code: str) -> str:
+        """
+        Create a temporary Python script file containing the provided code.
+        
+        :param code: Python code to write to a temporary file
+        :returns: Path to the created temporary .py file
+        """
+        fd, script_path = tempfile.mkstemp(suffix=".py", prefix="pwno_script_")
+        with os.fdopen(fd, 'w') as f:
+            f.write(code)
+        return script_path 
