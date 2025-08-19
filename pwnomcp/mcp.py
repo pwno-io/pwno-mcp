@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI
 import uvicorn
 
-from pwnomcp.utils.format import *
+import json
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
 from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools, PythonTools
@@ -100,7 +100,7 @@ mcp.settings.host = "0.0.0.0"
 mcp.settings.port = 5500
 
 @mcp.tool()
-async def execute(command: str) -> str:
+async def execute(command: str) -> Dict[str, Any]:
     """
     Execute arbitrary GDB/pwndbg command.
 
@@ -110,11 +110,11 @@ async def execute(command: str) -> str:
     # Access token is available via get_access_token() if needed
     # token = get_access_token().token if get_access_token() else None
     result = pwndbg_tools.execute(command)
-    return format_execute_result(result)
+    return result
 
 
 @mcp.tool()
-async def set_file(binary_path: str) -> str:
+async def set_file(binary_path: str) -> Dict[str, Any]:
     """
     Load a binary file for debugging.
 
@@ -122,11 +122,11 @@ async def set_file(binary_path: str) -> str:
     :returns: Loading status and binary information
     """
     result = pwndbg_tools.set_file(binary_path)
-    return format_file_result(result)
+    return result
 
 
 @mcp.tool()
-async def attach(pid: int) -> str:
+async def attach(pid: int) -> Dict[str, Any]:
     """
     Attach to an existing process by PID.
 
@@ -134,12 +134,11 @@ async def attach(pid: int) -> str:
     :returns: Attach status and initial context if stopped
     """
     result = pwndbg_tools.attach(pid)
-    # Reuse step-style formatter to include state and context if present
-    return format_step_result(result)
+    return result
 
 
 @mcp.tool()
-async def run(args: str = "", start: bool = False) -> str:
+async def run(args: str = "", start: bool = False) -> Dict[str, Any]:
     """
     Run the loaded binary.
     
@@ -150,11 +149,11 @@ async def run(args: str = "", start: bool = False) -> str:
     :returns: Execution results and state
     """
     result = pwndbg_tools.run(args, start)
-    return format_launch_result(result)
+    return result
 
 
 @mcp.tool()
-async def step_control(command: str) -> str:
+async def step_control(command: str) -> Dict[str, Any]:
     """
     Execute stepping commands (continue, next, step, nexti, stepi).
 
@@ -162,22 +161,22 @@ async def step_control(command: str) -> str:
     :returns: Execution results and new state
     """
     result = pwndbg_tools.step_control(command)
-    return format_step_result(result)
+    return result
 
 
 @mcp.tool()
-async def finish() -> str:
+async def finish() -> Dict[str, Any]:
     """
     Run until the current function returns.
 
     :returns: Execution results and new state
     """
     result = pwndbg_tools.finish()
-    return format_step_result(result)
+    return result
 
 
 @mcp.tool()
-async def jump(locspec: str) -> str:
+async def jump(locspec: str) -> Dict[str, Any]:
     """
     Resume execution at the specified location.
 
@@ -185,22 +184,22 @@ async def jump(locspec: str) -> str:
     :returns: Execution results and state
     """
     result = pwndbg_tools.jump(locspec)
-    return format_step_result(result)
+    return result
 
 
 @mcp.tool()
-async def return_from_function() -> str:
+async def return_from_function() -> Dict[str, Any]:
     """
     Make the current function return immediately.
 
     :returns: Execution results and state
     """
     result = pwndbg_tools.return_from_function()
-    return format_step_result(result)
+    return result
 
 
 @mcp.tool()
-async def until(locspec: Optional[str] = None) -> str:
+async def until(locspec: Optional[str] = None) -> Dict[str, Any]:
     """
     Run until a specified location, or the next source line if none provided.
 
@@ -208,11 +207,11 @@ async def until(locspec: Optional[str] = None) -> str:
     :returns: Execution results and state
     """
     result = pwndbg_tools.until(locspec)
-    return format_step_result(result)
+    return result
 
 
 @mcp.tool()
-async def get_context(context_type: str = "all") -> str:
+async def get_context(context_type: str = "all") -> Dict[str, Any]:
     """
     Get debugging context (registers, stack, disassembly, code, backtrace).
 
@@ -220,11 +219,11 @@ async def get_context(context_type: str = "all") -> str:
     :returns: Requested context information
     """
     result = pwndbg_tools.get_context(context_type)
-    return format_context_result(result)
+    return result
 
 
 @mcp.tool()
-async def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
+async def set_breakpoint(location: str, condition: Optional[str] = None) -> Dict[str, Any]:
     """
     Set a breakpoint at the specified location.
 
@@ -233,7 +232,7 @@ async def set_breakpoint(location: str, condition: Optional[str] = None) -> str:
     :returns: Breakpoint information
     """
     result = pwndbg_tools.set_breakpoint(location, condition)
-    return format_breakpoint_result(result)
+    return result
 
 
 @mcp.tool()
@@ -241,7 +240,7 @@ async def get_memory(
     address: str, 
     size: int = 64, 
     format: str = "hex"
-) -> str:
+) -> Dict[str, Any]:
     """
     Read memory at the specified address.
 
@@ -251,18 +250,18 @@ async def get_memory(
     :returns: Memory contents in the requested format
     """
     result = pwndbg_tools.get_memory(address, size, format)
-    return format_memory_result(result)
+    return result
 
 
 @mcp.tool()
-async def get_session_info() -> str:
+async def get_session_info() -> Dict[str, Any]:
     """
     Get current debugging session information.
 
     :returns: Session state and debugging artifacts
     """
     result = pwndbg_tools.get_session_info()
-    return format_session_result(result)
+    return result
 
 
 @mcp.tool()

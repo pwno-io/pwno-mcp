@@ -35,6 +35,8 @@ stateful system for autonomous `pwn` and binary research, designed for LLMs agen
   - *note: to use pwno's retdec server, you need to `export BINARY_URL=<your-binary-url>`*
 - **Auth**: Authentication via a nonce
 
+*`pwno-mcp`*
+
 ## Installation
 
 ### From Source

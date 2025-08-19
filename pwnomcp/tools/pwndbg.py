@@ -27,495 +27,177 @@ class PwndbgTools:
         self.session = session_state
         
     def execute(self, command: str) -> Dict[str, Any]:
-        """
-        Execute arbitrary GDB/pwndbg command
-        
-        This is the general-purpose tool for running any GDB command.
-        
-        Args:
-            command: GDB command to execute
-            
-        Returns:
-            Dictionary containing:
-                - command: The executed command
-                - output: Console output from command
-                - error: Any error messages
-                - state: Current inferior state after command
-        """
+        """Execute arbitrary GDB/pwndbg command and return raw responses"""
         logger.info(f"Execute tool: {command}")
-        
-        # Execute the command
         result = self.gdb.execute_command(command)
-        
-        # Update session state
         self.session.update_state(result["state"])
         self.session.record_command(command, result)
-        
         return result
         
     def set_file(self, binary_path: str) -> Dict[str, Any]:
-        """
-        Set the file to debug
-        
-        Args:
-            binary_path: Path to binary to debug
-            
-        Returns:
-            Dictionary with file loading status
-        """
+        """Set the file to debug; return raw responses"""
         logger.info(f"Set file: {binary_path}")
-        
-        # Load the binary using GDB controller
         result = self.gdb.set_file(binary_path)
-        
-        # Update session state if successful
-        if not result.get("error"):
+        if result.get("success"):
             self.session.binary_path = binary_path
             self.session.binary_loaded = True
-            
-        return {
-            "success": not result.get("error"),
-            "output": result["output"],
-            "error": result.get("error"),
-            "state": result["state"]
-        }
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", f"-file-exec-and-symbols {binary_path}"), result)
+        return result
 
     def attach(self, pid: int) -> Dict[str, Any]:
-        """
-        Attach to an existing process
-        
-        Args:
-            pid: Process ID to attach to
-        
-        Returns:
-            Dictionary with attach status
-        """
+        """Attach to an existing process; return raw responses"""
         logger.info(f"Attach to pid: {pid}")
-
         result = self.gdb.attach(pid)
-
-        # Update session state if successful
-        if not result.get("error"):
+        if result.get("success"):
             self.session.pid = pid
-            self.session.update_state(result["state"]) 
-            self.session.record_command(result.get("command", f"attach {pid}"), result)
-
-        # Get context if stopped
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-
-        return {
-            "success": not result.get("error"),
-            "output": result["output"],
-            "error": result.get("error"),
-            "state": result["state"],
-            "pid": result.get("pid"),
-            "context": context
-        }
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", f"-target-attach {pid}"), result)
+        return result
         
     def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
-        """
-        Run the loaded binary. Requires at least one enabled breakpoint to be set.
-        
-        Args:
-            args: Arguments to pass to the binary
-            start: If True, stop at program entry (GDB --start)
-            
-        Returns:
-            Dictionary with execution results
-        """
+        """Run the loaded binary; return raw responses"""
         logger.info(f"Run with args: '{args}'")
-        
-        # Check if binary is loaded
         if not self.session.binary_loaded:
-            return {
-                "success": False,
-                "error": "No binary loaded. Use set_file first."
-            }
-        
-        # Enforce: breakpoints must be set prior to running
-        bp_result = self.gdb.list_breakpoints()
-        bp_list = bp_result.get("breakpoints") or []
-        enabled_bps = [bp for bp in bp_list if bp.get("enabled", "y") == "y"]
-        if not enabled_bps:
-            return {
-                "success": False,
-                "error": "No breakpoints set. Set at least one enabled breakpoint before running."
-            }
-            
-        # Run the program
+            return {"command": "-exec-run", "responses": [], "success": False, "state": self.gdb.get_state(), "error": "No binary loaded. Use set_file first."}
         result = self.gdb.run(args, start=start)
-        
-        # Update session state
         self.session.update_state(result["state"])
-        self.session.record_command(result.get("command", f"run {args}"), result)
-        
-        # Get context if stopped
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-            
-        return {
-            "success": not result.get("error"),
-            "output": result["output"],
-            "error": result.get("error"),
-            "state": result["state"],
-            "context": context
-        }
+        self.session.record_command(result.get("command", "-exec-run"), result)
+        return result
 
     def finish(self) -> Dict[str, Any]:
-        """Run until current function finishes (-exec-finish)"""
+        """Run until current function finishes; return raw responses"""
         logger.info("Finish current function")
         result = self.gdb.finish()
         self.session.update_state(result["state"])
-        self.session.record_command(result.get("command", "finish"), result)
-
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-
-        return {
-            "success": not result.get("error"),
-            "command": "finish",
-            "output": result.get("output"),
-            "error": result.get("error"),
-            "state": result["state"],
-            "context": context
-        }
+        self.session.record_command(result.get("command", "-exec-finish"), result)
+        return result
 
     
 
     def jump(self, locspec: str) -> Dict[str, Any]:
-        """Jump to a specific location (-exec-jump)"""
+        """Jump to a specific location; return raw responses"""
         logger.info(f"Jump to {locspec}")
         result = self.gdb.jump(locspec)
         self.session.update_state(result["state"])
-        self.session.record_command(result.get("command", f"jump {locspec}"), result)
-
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-
-        return {
-            "success": not result.get("error"),
-            "command": "jump",
-            "output": result.get("output"),
-            "error": result.get("error"),
-            "state": result["state"],
-            "context": context
-        }
+        self.session.record_command(result.get("command", f"-exec-jump {locspec}"), result)
+        return result
 
     def return_from_function(self) -> Dict[str, Any]:
-        """Force return from current function (-exec-return)"""
+        """Force return from current function; return raw responses"""
         logger.info("Force return from current function")
         result = self.gdb.return_from_function()
         self.session.update_state(result["state"])
-        self.session.record_command(result.get("command", "return"), result)
-
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-
-        return {
-            "success": not result.get("error"),
-            "command": "return",
-            "output": result.get("output"),
-            "error": result.get("error"),
-            "state": result["state"],
-            "context": context
-        }
+        self.session.record_command(result.get("command", "-exec-return"), result)
+        return result
 
     def until(self, locspec: Optional[str] = None) -> Dict[str, Any]:
-        """Run until a location or next source line (-exec-until)"""
+        """Run until a location or next source line; return raw responses"""
         logger.info(f"Until {locspec if locspec else '[next line]'}")
         result = self.gdb.until(locspec)
         self.session.update_state(result["state"])
-        self.session.record_command(result.get("command", "until"), result)
-
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-
-        return {
-            "success": not result.get("error"),
-            "command": "until",
-            "output": result.get("output"),
-            "error": result.get("error"),
-            "state": result["state"],
-            "context": context
-        }
+        self.session.record_command(result.get("command", "-exec-until"), result)
+        return result
         
     def step_control(self, command: str) -> Dict[str, Any]:
-        """
-        Execute stepping commands (c, n, s, ni, si)
-        
-        This provides proper support for program flow control.
-        
-        Args:
-            command: Stepping command (continue, next, step, nexti, stepi)
-            
-        Returns:
-            Dictionary with execution results and new state
-        """
+        """Execute stepping commands (c, n, s, ni, si); return raw responses"""
         logger.info(f"Step control: {command}")
-        
-        # Map command aliases
         command_map = {
             "c": "continue",
-            "n": "next", 
+            "n": "next",
             "s": "step",
             "ni": "nexti",
-            "si": "stepi"
+            "si": "stepi",
         }
-        
-        actual_command = command_map.get(command, command)
-        
-        # Check if we can execute the command
+        actual = command_map.get(command, command)
         current_state = self.gdb.get_state()
-        
-        if actual_command == "continue" and current_state == "stopped":
+        if current_state != "stopped":
+            return {"command": actual, "responses": [], "success": False, "state": current_state, "error": f"Cannot execute '{command}' in state '{current_state}'"}
+        if actual == "continue":
             result = self.gdb.continue_execution()
-        elif actual_command in ["next", "step", "nexti", "stepi"] and current_state == "stopped":
-            # Use the appropriate method
-            method = getattr(self.gdb, actual_command.replace("i", "i" if "i" in actual_command else ""))
-            result = method()
+        elif actual == "next":
+            result = self.gdb.next()
+        elif actual == "step":
+            result = self.gdb.step()
+        elif actual == "nexti":
+            result = self.gdb.nexti()
+        elif actual == "stepi":
+            result = self.gdb.stepi()
         else:
-            return {
-                "success": False,
-                "error": f"Cannot execute '{command}' in state '{current_state}'",
-                "state": current_state
-            }
-            
-        # Update session state
+            return {"command": actual, "responses": [], "success": False, "state": current_state, "error": f"Unknown step command '{command}'"}
         self.session.update_state(result["state"])
-        self.session.record_command(result.get("command", actual_command), result)
-        
-        # Get context if stopped
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-            
-        return {
-            "success": not result.get("error"),
-            "command": actual_command,
-            "output": result["output"],
-            "error": result.get("error"),
-            "state": result["state"],
-            "context": context
-        }
+        self.session.record_command(result.get("command", actual), result)
+        return result
         
     def get_context(self, context_type: str = "all") -> Dict[str, Any]:
-        """
-        Get debugging context (registers, stack, disassembly, etc.)
-        
-        Args:
-            context_type: Type of context or "all" for complete context
-            
-        Returns:
-            Dictionary with requested context information
-        """
+        """Get debugging context (registers, stack, disassembly, etc.)"""
         logger.info(f"Get context: {context_type}")
-        
         if self.gdb.get_state() != "stopped":
-            return {
-                "success": False,
-                "error": f"Cannot get context while inferior is {self.gdb.get_state()}"
-            }
-            
+            return {"command": f"context {context_type}", "responses": [], "success": False, "state": self.gdb.get_state(), "error": f"Cannot get context while inferior is {self.gdb.get_state()}"}
         if context_type == "all":
-            return {
-                "success": True,
-                "context": self._get_full_context()
-            }
+            # Aggregate raw responses of each context call
+            aggregated = {"success": True, "state": self.gdb.get_state(), "contexts": {}}
+            for ctx_type in ["regs", "stack", "disasm", "code", "backtrace"]:
+                aggregated["contexts"][ctx_type] = self.gdb.get_context(ctx_type)
+            self.session.record_command("context all", aggregated)
+            return aggregated
         else:
             result = self.gdb.get_context(context_type)
-            return {
-                "success": not result.get("error"),
-                "context_type": context_type,
-                "data": result.get("data"),
-                "error": result.get("error")
-            }
+            self.session.record_command(f"context {context_type}", result)
+            return result
             
     def set_breakpoint(self, location: str, condition: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Set a breakpoint
-        
-        Args:
-            location: Address or symbol for breakpoint
-            condition: Optional breakpoint condition
-            
-        Returns:
-            Dictionary with breakpoint information
-        """
+        """Set a breakpoint; return raw responses"""
         logger.info(f"Set breakpoint at {location}")
-        
-        # Use GDB controller's MI-based breakpoint method
         result = self.gdb.set_breakpoint(location, condition)
-        
-        # Extract breakpoint info from structured payload
-        if not result.get("error") and result.get("payload"):
-            bkpt_info = result["payload"].get("bkpt", {})
-            bp_num = bkpt_info.get("number")
-            if bp_num:
-                # Store as int
-                bp_num = int(bp_num)
-                # Use actual address from response if available
-                addr = bkpt_info.get("addr", location)
-                self.session.add_breakpoint(bp_num, addr, condition)
-                
-        return {
-            "success": not result.get("error"),
-            "output": result["output"],
-            "error": result.get("error"),
-            "breakpoint_info": result.get("payload", {}).get("bkpt") if result.get("payload") else None
-        }
+        self.session.record_command(result.get("command", "-break-insert"), result)
+        return result
         
     def list_breakpoints(self) -> Dict[str, Any]:
-        """
-        List all breakpoints
-        
-        Returns:
-            Dictionary with breakpoint list
-        """
+        """List all breakpoints; return raw responses"""
         logger.info("List breakpoints")
-        
         result = self.gdb.list_breakpoints()
-        
-        # Format breakpoint information
-        breakpoints = []
-        if result.get("breakpoints"):
-            for bp in result["breakpoints"]:
-                bp_info = {
-                    "number": int(bp.get("number", 0)),
-                    "type": bp.get("type", "breakpoint"),
-                    "enabled": bp.get("enabled", "y") == "y",
-                    "address": bp.get("addr", ""),
-                    "function": bp.get("func", ""),
-                    "file": bp.get("file", ""),
-                    "line": bp.get("line", ""),
-                    "condition": bp.get("cond", ""),
-                    "hit_count": int(bp.get("times", 0))
-                }
-                breakpoints.append(bp_info)
-                
-        return {
-            "success": not result.get("error"),
-            "breakpoints": breakpoints,
-            "error": result.get("error")
-        }
+        self.session.record_command(result.get("command", "-break-list"), result)
+        return result
         
     def delete_breakpoint(self, number: int) -> Dict[str, Any]:
-        """
-        Delete a breakpoint
-        
-        Args:
-            number: Breakpoint number to delete
-            
-        Returns:
-            Dictionary with deletion status
-        """
+        """Delete a breakpoint; return raw responses"""
         logger.info(f"Delete breakpoint #{number}")
-        
         result = self.gdb.delete_breakpoint(number)
-        
-        # Update session state
-        if not result.get("error"):
-            self.session.remove_breakpoint(number)
-            
-        return {
-            "success": not result.get("error"),
-            "output": result["output"],
-            "error": result.get("error")
-        }
+        self.session.record_command(result.get("command", f"-break-delete {number}"), result)
+        return result
         
     def toggle_breakpoint(self, number: int, enable: bool) -> Dict[str, Any]:
-        """
-        Enable or disable a breakpoint
-        
-        Args:
-            number: Breakpoint number
-            enable: True to enable, False to disable
-            
-        Returns:
-            Dictionary with toggle status
-        """
+        """Enable or disable a breakpoint; return raw responses"""
         action = "enable" if enable else "disable"
         logger.info(f"{action} breakpoint #{number}")
-        
-        if enable:
-            result = self.gdb.enable_breakpoint(number)
-        else:
-            result = self.gdb.disable_breakpoint(number)
-            
-        # Update session state
-        if not result.get("error"):
-            self.session.toggle_breakpoint(number)
-            
-        return {
-            "success": not result.get("error"),
-            "output": result["output"],
-            "error": result.get("error")
-        }
+        result = self.gdb.enable_breakpoint(number) if enable else self.gdb.disable_breakpoint(number)
+        self.session.record_command(result.get("command", f"-break-{action} {number}"), result)
+        return result
         
     def _get_full_context(self) -> Dict[str, Any]:
-        """Get complete debugging context"""
+        """Get complete debugging context (raw responses per context)"""
         contexts = {}
         for ctx_type in ["regs", "stack", "disasm", "code", "backtrace"]:
-            ctx_result = self.gdb.get_context(ctx_type)
-            if not ctx_result.get("error"):
-                contexts[ctx_type] = ctx_result["data"]
-                
+            contexts[ctx_type] = self.gdb.get_context(ctx_type)
         return contexts
         
     def get_memory(self, address: str, size: int = 64, format: str = "hex") -> Dict[str, Any]:
-        """
-        Read memory at specified address
-        
-        Args:
-            address: Memory address to read
-            size: Number of bytes to read
-            format: Output format (hex, string, int)
-            
-        Returns:
-            Dictionary with memory contents
-        """
+        """Read memory at specified address; return raw responses"""
         logger.info(f"Read memory at {address}, {size} bytes as {format}")
-        
-        # Use appropriate pwndbg command based on format
         if format == "hex":
             cmd = f"hexdump {address} {size}"
         elif format == "string":
             cmd = f"x/s {address}"
         else:
             cmd = f"x/{size}b {address}"
-            
         result = self.gdb.execute_command(cmd)
-        
-        return {
-            "success": not result.get("error"),
-            "address": address,
-            "size": size,
-            "format": format,
-            "data": result["output"],
-            "error": result.get("error")
-        }
+        self.session.record_command(cmd, result)
+        return result
         
     def get_session_info(self) -> Dict[str, Any]:
-        """Get current session information"""
-        # Sync breakpoints with GDB
-        bp_result = self.gdb.list_breakpoints()
-        if bp_result.get("breakpoints"):
-            # Clear and rebuild breakpoint list from GDB
-            self.session.breakpoints.clear()
-            for bp in bp_result["breakpoints"]:
-                self.session.add_breakpoint(
-                    int(bp.get("number", 0)),
-                    bp.get("addr", ""),
-                    bp.get("cond", "")
-                )
-                
+        """Get current session information (no GDB sync/parsing)"""
         return {
             "session": self.session.to_dict(),
             "gdb_state": self.gdb.get_state()
-        } 
+        }
