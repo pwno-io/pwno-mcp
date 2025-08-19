@@ -139,20 +139,17 @@ async def attach(pid: int) -> str:
 
 
 @mcp.tool()
-async def run(args: str = "", interrupt_after: Optional[float] = None, start: bool = False) -> str:
+async def run(args: str = "", start: bool = False) -> str:
     """
     Run the loaded binary.
     
-    Before running, you should either:
-    1. Set breakpoints at key locations (recommended), OR
-    2. Use interrupt_after to pause execution after N seconds
+    Requires at least one enabled breakpoint to be set before running.
 
     :param args: Arguments to pass to the binary
-    :param interrupt_after: Optional - interrupt execution after N seconds
     :param start: Optional - stop at program entry (equivalent to --start)
     :returns: Execution results and state
     """
-    result = pwndbg_tools.run(args, interrupt_after, start)
+    result = pwndbg_tools.run(args, start)
     return format_launch_result(result)
 
 
@@ -176,19 +173,6 @@ async def finish() -> str:
     :returns: Execution results and new state
     """
     result = pwndbg_tools.finish()
-    return format_step_result(result)
-
-
-@mcp.tool()
-async def interrupt(all_threads: bool = False, thread_group: Optional[str] = None) -> str:
-    """
-    Interrupt the target's execution.
-
-    :param all_threads: Interrupt all threads (non-stop mode)
-    :param thread_group: Interrupt only the specified thread group
-    :returns: Interrupt results and state
-    """
-    result = pwndbg_tools.interrupt_execution(all_threads=all_threads, thread_group=thread_group)
     return format_step_result(result)
 
 
