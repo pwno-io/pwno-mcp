@@ -115,19 +115,18 @@ class PwndbgTools:
             "context": context
         }
         
-    def run(self, args: str = "", interrupt_after: Optional[float] = None, start: bool = False) -> Dict[str, Any]:
+    def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
         """
-        Run the loaded binary
+        Run the loaded binary. Requires at least one enabled breakpoint to be set.
         
         Args:
             args: Arguments to pass to the binary
-            interrupt_after: Send interrupt signal after specified seconds
             start: If True, stop at program entry (GDB --start)
             
         Returns:
             Dictionary with execution results
         """
-        logger.info(f"Run with args: '{args}', interrupt_after: {interrupt_after}")
+        logger.info(f"Run with args: '{args}'")
         
         # Check if binary is loaded
         if not self.session.binary_loaded:
@@ -135,30 +134,19 @@ class PwndbgTools:
                 "success": False,
                 "error": "No binary loaded. Use set_file first."
             }
+        
+        # Enforce: breakpoints must be set prior to running
+        bp_result = self.gdb.list_breakpoints()
+        bp_list = bp_result.get("breakpoints") or []
+        enabled_bps = [bp for bp in bp_list if bp.get("enabled", "y") == "y"]
+        if not enabled_bps:
+            return {
+                "success": False,
+                "error": "No breakpoints set. Set at least one enabled breakpoint before running."
+            }
             
         # Run the program
         result = self.gdb.run(args, start=start)
-        
-        # If interrupt_after is specified and program is running, schedule interrupt
-        if interrupt_after and result.get("state") == "running":
-            import threading
-            
-            def interrupt_program():
-                logger.info(f"Interrupting program after {interrupt_after} seconds")
-                # Prefer MI interrupt for correctness with mi-async
-                interrupt_result = self.gdb.interrupt_execution(all_threads=False)
-                logger.info(f"Interrupt result: {interrupt_result}")
-                
-            # Schedule interrupt
-            timer = threading.Timer(interrupt_after, interrupt_program)
-            timer.daemon = True
-            timer.start()
-            
-            # Note in the output
-            if result.get("output"):
-                result["output"] += f"\n[Note: Interrupt scheduled after {interrupt_after} seconds]"
-            else:
-                result["output"] = f"[Note: Interrupt scheduled after {interrupt_after} seconds]"
         
         # Update session state
         self.session.update_state(result["state"])
@@ -197,25 +185,7 @@ class PwndbgTools:
             "context": context
         }
 
-    def interrupt_execution(self, all_threads: bool = False, thread_group: Optional[str] = None) -> Dict[str, Any]:
-        """Interrupt the target using MI (-exec-interrupt)"""
-        logger.info("Interrupt execution via MI")
-        result = self.gdb.interrupt_execution(all_threads=all_threads, thread_group=thread_group)
-        self.session.update_state(result["state"])
-        self.session.record_command(result.get("command", "interrupt"), result)
-
-        context = None
-        if result["state"] == "stopped":
-            context = self._get_full_context()
-
-        return {
-            "success": not result.get("error"),
-            "command": "interrupt",
-            "output": result.get("output"),
-            "error": result.get("error"),
-            "state": result["state"],
-            "context": context
-        }
+    
 
     def jump(self, locspec: str) -> Dict[str, Any]:
         """Jump to a specific location (-exec-jump)"""
