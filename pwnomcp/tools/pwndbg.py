@@ -12,7 +12,6 @@ from pwnomcp.state import SessionState
 
 logger = logging.getLogger(__name__)
 
-
 class PwndbgTools:
     """MCP tools for pwndbg interaction"""
     
