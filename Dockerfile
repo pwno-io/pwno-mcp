@@ -53,6 +53,12 @@ ENV UV_PROJECT_ENVIRONMENT=/app/.venv
 
 RUN uv sync
 
+# Pre-create the shared PythonTools venv used by Pwno MCP to avoid runtime setup
+RUN mkdir -p /tmp/pwno_python_workspace && \
+    uv venv /tmp/pwno_python_workspace/shared_venv && \
+    uv pip install --python /tmp/pwno_python_workspace/shared_venv \
+      requests numpy ipython hexdump pwntools
+
 EXPOSE 5500
 ENTRYPOINT ["/bin/bash"] 
 # You might be looking for: ["uv", "run", "-m", "pwnomcp"] 

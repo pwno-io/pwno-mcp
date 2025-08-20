@@ -24,6 +24,7 @@ class PythonTools:
         "numpy",
         "ipython",
         "hexdump",
+        "pwntools",
     ]
     
     def __init__(self):
@@ -41,6 +42,7 @@ class PythonTools:
     def _initialize_venv(self):
         """
         Initialize the shared venv and install default packages.
+        * This will avoid initalizing if the venv already exists (Dockerfile)
         """
         if not os.path.exists(self.venv_path):
             logger.info("Creating shared Python environment...")
