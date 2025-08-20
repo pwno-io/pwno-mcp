@@ -14,6 +14,8 @@ from typing import Dict, Any, Optional, List
 import psutil
 import os
 import tempfile
+import time
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -341,3 +343,50 @@ class SubprocessTools:
             "processes": processes,
             "count": len(processes)
         } 
+
+    def wait_for_pid_marker(self, stdout_path: str, timeout: float = 10.0, poll_interval: float = 0.05) -> Dict[str, Any]:
+        """
+        Wait for a PID marker of the form "<PID>{1234}</PID>" to appear in a stdout log file.
+
+        Args:
+            stdout_path: Path to the stdout log file produced by spawn_process
+            timeout: Maximum time to wait in seconds
+            poll_interval: How often to poll for new output
+
+        Returns:
+            Dictionary with keys:
+            - success: whether a PID marker was found
+            - pid: the captured PID if found
+            - elapsed: time spent waiting
+            - bytes_scanned: how many bytes of the file were scanned
+            - error: error message if any
+        """
+        start_time = time.time()
+        pattern = re.compile(r"<PID>\{(?P<pid>\d+)\}</PID>")
+        bytes_scanned = 0
+
+        try:
+            if not os.path.exists(stdout_path):
+                return {"success": False, "error": "stdout file not found", "elapsed": 0.0, "bytes_scanned": 0}
+
+            with open(stdout_path, "r", encoding="utf-8", errors="ignore") as f:
+                while True:
+                    chunk = f.read()
+                    if chunk:
+                        bytes_scanned += len(chunk)
+                        match = pattern.search(chunk)
+                        if match:
+                            elapsed = time.time() - start_time
+                            return {
+                                "success": True,
+                                "pid": int(match.group("pid")),
+                                "elapsed": elapsed,
+                                "bytes_scanned": bytes_scanned
+                            }
+
+                    if time.time() - start_time >= timeout:
+                        return {"success": False, "error": "timeout", "elapsed": timeout, "bytes_scanned": bytes_scanned}
+                    time.sleep(poll_interval)
+        except Exception as e:
+            logger.error(f"Failed while waiting for PID marker: {e}")
+            return {"success": False, "error": str(e), "elapsed": time.time() - start_time, "bytes_scanned": bytes_scanned}

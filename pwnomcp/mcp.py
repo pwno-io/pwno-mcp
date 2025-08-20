@@ -8,9 +8,7 @@ Provides GDB/pwndbg functionality via MCP tools for LLM interaction.
 import logging
 import json
 import os
-import re
-import asyncio
-import time
+import shlex
 from typing import Optional, Dict, Any
 from mcp.server.fastmcp import FastMCP
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -428,112 +426,48 @@ async def execute_python_code(
 
 
 @mcp.tool()
-async def trigger_solve(
-    cwd: Optional[str] = None,
-    wait_timeout: float = 60.0
+async def solve(
+    script: str,
+    pid_timeout: float = 10.0
 ) -> str:
     """
-    Trigger the pre-populated solve script in the background and return inner PID.
+    Execute provided Python script content under /workspace and wait for PID marker.
 
-    The solve script at ``/workspace/solve.py`` is executed using the shared
-    Python environment. This endpoint starts the script in the background and
-    waits until the script prints an inner process PID to stdout in the form
-    ``<PID>{pid}</PID>``. As soon as the marker is observed, the captured PID
-    is returned without waiting for the script to finish.
+    Behavior:
+    - Writes the received script content to `/workspace/solve.py`
+    - Launches it with unbuffered Python I/O under `/workspace`
+    - Waits up to pid_timeout seconds for `<PID>{pid}</PID>` to appear in stdout
+    - Returns outer process info and captured `inner_pid` if present
 
-    :param cwd: Working directory for execution (default: /workspace)
-    :param wait_timeout: Maximum seconds to wait for the ``<PID>`` marker
-    :returns: JSON including ``inner_pid`` (if found), runner PID, and log paths
+    :param script: Full Python script content to execute
+    :param pid_timeout: Seconds to wait for PID marker in stdout
+    :returns: JSON with outer pid, stdout/stderr paths, and captured inner_pid if present
     """
-    if cwd is None:
-        cwd = DEFAULT_WORKSPACE
+    try:
+        # Ensure workspace directory exists
+        os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
+        script_path = os.path.join(DEFAULT_WORKSPACE, "solve.py")
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(script)
 
-    script_path = "/workspace/solve.py"
-    if not os.path.isabs(script_path):
-        script_path = os.path.join(DEFAULT_WORKSPACE, script_path)
-
-    if not os.path.exists(script_path):
+        python_exe = python_tools.get_python_executable()
+        base_cmd = f"{python_exe} -u {shlex.quote(script_path)}"
+        env = {"PYTHONUNBUFFERED": "1"}
+        spawn = subprocess_tools.spawn_process(base_cmd, cwd=DEFAULT_WORKSPACE, env=env)
+        # Try to extract inner PID
+        if spawn.get("stdout_path"):
+            pid_capture = subprocess_tools.wait_for_pid_marker(spawn["stdout_path"], timeout=pid_timeout)
+            spawn["inner_pid_lookup"] = pid_capture
+            if pid_capture.get("success") and "pid" in pid_capture:
+                spawn["inner_pid"] = pid_capture["pid"]
+        spawn["script_path"] = script_path
+        spawn["command"] = base_cmd
+        return json.dumps(spawn, indent=2)
+    except Exception as e:
         return json.dumps({
             "success": False,
-            "error": f"Solve script not found at {script_path}"
+            "error": str(e)
         }, indent=2)
-
-    python_exe = python_tools.get_python_executable()
-    cmd = f"{python_exe} {script_path}"
-    spawn = subprocess_tools.spawn_process(cmd, cwd=cwd)
-
-    # Prepare response basics
-    response: Dict[str, Any] = {
-        "success": spawn.get("success", False),
-        "status": "started" if spawn.get("success") else "error",
-        "script_path": script_path,
-        "command": cmd,
-        "runner_pid": spawn.get("pid"),
-        "stdout_path": spawn.get("stdout_path"),
-        "stderr_path": spawn.get("stderr_path"),
-        "cwd": cwd
-    }
-
-    if not spawn.get("success"):
-        # Early return on spawn failure
-        response.update({
-            "error": spawn.get("error"),
-            "returncode": spawn.get("returncode"),
-            "stdout": spawn.get("stdout"),
-            "stderr": spawn.get("stderr")
-        })
-        return json.dumps(response, indent=2)
-
-    # Tail stdout file until we see <PID>{pid}</PID> or timeout
-    stdout_path = spawn.get("stdout_path")
-    pid_pattern = re.compile(r"<PID>(\d+)</PID>")
-    start_time = time.time()
-    captured_pid: Optional[int] = None
-
-    # Keep last read size to avoid re-reading entire file unnecessarily
-    last_size = 0
-    try:
-        while time.time() - start_time < wait_timeout:
-            try:
-                current_size = os.path.getsize(stdout_path) if stdout_path else 0
-                if current_size < last_size:
-                    # File truncated/rotated; reset
-                    last_size = 0
-                if stdout_path and current_size > last_size:
-                    with open(stdout_path, "r") as f:
-                        f.seek(last_size)
-                        chunk = f.read()
-                        last_size = f.tell()
-                        match = pid_pattern.search(chunk)
-                        if match:
-                            captured_pid = int(match.group(1))
-                            break
-            except FileNotFoundError:
-                # If file not ready yet, keep waiting
-                pass
-
-            # Also stop early if the runner process terminated
-            proc_status = subprocess_tools.get_process(response["runner_pid"]) if response.get("runner_pid") else None
-            if proc_status and proc_status.get("status") == "terminated":
-                # Do one final scan of full stdout
-                if stdout_path and os.path.exists(stdout_path):
-                    with open(stdout_path, "r") as f:
-                        data = f.read()
-                        match = pid_pattern.search(data)
-                        if match:
-                            captured_pid = int(match.group(1))
-                break
-
-            await asyncio.sleep(0.2)
-    except Exception as e:
-        response["pid_capture_error"] = str(e)
-
-    response["inner_pid"] = captured_pid
-    response["pid_found"] = captured_pid is not None
-    if captured_pid is None:
-        response["note"] = "PID marker not found within timeout"
-
-    return json.dumps(response, indent=2)
 
 
 @mcp.tool()

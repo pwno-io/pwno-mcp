@@ -15,6 +15,7 @@ dependencies = [
     "rich>=14.1.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
+    "pwntools>=4.14.1",
 ]
 
 [project.optional-dependencies]
