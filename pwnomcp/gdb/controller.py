@@ -7,7 +7,7 @@ immediate responses suitable for LLM interaction.
 """
 
 import logging
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 from pathlib import Path
 from pygdbmi import gdbcontroller
 import os
@@ -57,7 +57,6 @@ class GdbController:
         mi_async_set = self.execute_mi_command("set mi-async on")
         results.append(mi_async_set)
         
-        # Verify pwndbg is loaded
         pwndbg_check = self.execute_command("pwndbg")
         results.append(pwndbg_check)
         
@@ -195,16 +194,27 @@ class GdbController:
         # Ensure returned state reflects any updates
         result["state"] = self._state
         return result
-
-    def attach(self, pid: int) -> Dict[str, Any]:
+    
+    def attach(self, pid: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Attach to an existing process using MI command (-target-attach)"""
+        self.execute_command("set pagination off")
+        self.execute_command("set confirm off")
+        self.execute_command("set detach-on-fork off")
+        self.execute_command("set follow-fork-mode parent")
+        self.execute_command("set follow-exec-mode same")
+        
         result = self.execute_mi_command(f"-target-attach {pid}")
         if result["success"]:
             self._inferior_pid = pid
             self._state = "stopped"
         result["state"] = self._state
         result["pid"] = self._inferior_pid
-        return result
+
+        context = []
+        context.append(self.get_context("backtrace"))
+        context.append(self.get_context("heap"))
+        
+        return result, context
         
     def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
         """Run the loaded program using MI command"""

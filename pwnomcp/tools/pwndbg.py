@@ -6,7 +6,7 @@ Each tool returns immediate results suitable for LLM interaction.
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
 
@@ -45,15 +45,15 @@ class PwndbgTools:
         self.session.record_command(result.get("command", f"-file-exec-and-symbols {binary_path}"), result)
         return result
 
-    def attach(self, pid: int) -> Dict[str, Any]:
+    def attach(self, pid: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Attach to an existing process; return raw responses"""
         logger.info(f"Attach to pid: {pid}")
-        result = self.gdb.attach(pid)
+        result, context = self.gdb.attach(pid)
         if result.get("success"):
             self.session.pid = pid
         self.session.update_state(result["state"])
         self.session.record_command(result.get("command", f"-target-attach {pid}"), result)
-        return result
+        return result, context
         
     def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
         """Run the loaded binary; return raw responses"""

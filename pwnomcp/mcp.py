@@ -9,7 +9,7 @@ import logging
 import json
 import os
 import shlex
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple, List
 from mcp.server.fastmcp import FastMCP
 from mcp.server.auth.middleware.auth_context import get_access_token
 from contextlib import asynccontextmanager
@@ -127,15 +127,15 @@ async def set_file(binary_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def attach(pid: int) -> Dict[str, Any]:
+async def attach(pid: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """
     Attach to an existing process by PID.
 
     :param pid: Process ID to attach to
     :returns: Attach status and initial context if stopped
     """
-    result = pwndbg_tools.attach(pid)
-    return result
+    result, context = pwndbg_tools.attach(pid)
+    return result, context
 
 
 @mcp.tool()
