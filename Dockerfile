@@ -30,6 +30,7 @@ COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY pwnomcp ./pwnomcp
 COPY pwnomcp.service /etc/systemd/system/pwnomcp.service
+COPY attach.gdb /app/attach.gdb
 
 # Create workspace directory for command execution
 RUN mkdir -p /workspace
