@@ -7,7 +7,7 @@ RUN dpkg --add-architecture i386 && \
     apt-get install -y --no-install-recommends \
       curl wget git vim nano file tmux sudo unzip ca-certificates \
       build-essential gcc g++ clang make cmake bison flex gcc-multilib \
-      gdb gdbserver gdb-multiarch lldb strace ltrace patchelf elfutils \
+      gdb gdbserver gdb-multiarch lldb strace ltrace patchelf elfutils libc6-dbg \
       qemu-system-x86 qemu-user qemu-user-binfmt \
       python3 python3-pip python3-venv python3-dev python3-setuptools python3-poetry \
       libasan8 libubsan1 liblsan0 libtsan2 \
