@@ -7,7 +7,6 @@ Each tool returns immediate results suitable for LLM interaction.
 
 import logging
 from typing import Dict, Any, Optional
-import os
 from pwnomcp.gdb import GdbController
 from pwnomcp.state import SessionState
 
@@ -47,53 +46,14 @@ class PwndbgTools:
         return result
 
     def attach(self, pid: int) -> Dict[str, Any]:
-        """Attach to an existing process using attach.gdb script; return aggregated responses"""
-        logger.info(f"Attach to pid via script: {pid}")
-        # Resolve script path: prefer /app/attach.gdb then /workspace/attach.gdb
-        candidate_paths = [
-            "/app/attach.gdb",
-            "/workspace/attach.gdb",
-        ]
-        script_path = None
-        for p in candidate_paths:
-            if os.path.exists(p):
-                script_path = p
-                break
-        if not script_path:
-            # Fallback to plain MI attach
-            logger.warning("attach.gdb not found; falling back to MI attach")
-            result = self.gdb.attach(pid)
-            if result.get("success"):
-                self.session.pid = pid
-            self.session.update_state(result["state"])
-            self.session.record_command(result.get("command", f"-target-attach {pid}"), result)
-            return {"script_used": None, **result}
-
-        # Load and preprocess script
-        with open(script_path, "r", encoding="utf-8", errors="ignore") as f:
-            content = f.read()
-        content = content.replace("$PID", str(pid))
-        lines = [line.strip() for line in content.splitlines() if line.strip() and not line.strip().startswith("#")]
-
-        results: list[dict] = []
-        attached = False
-        # Execute commands; use MI for attach specifically
-        for line in lines:
-            if line.startswith("attach ") and not attached:
-                res = self.gdb.attach(pid)
-                attached = True
-            else:
-                res = self.gdb.execute_command(line)
-            results.append({"command": line, **res})
-
-        # Update session status
-        final_state = results[-1]["state"] if results else self.gdb.get_state()
-        if attached:
+        """Attach to an existing process; return raw responses"""
+        logger.info(f"Attach to pid: {pid}")
+        result = self.gdb.attach(pid)
+        if result.get("success"):
             self.session.pid = pid
-        self.session.update_state(final_state)
-        self.session.record_command(f"attach {pid} (script)", {"results": results, "state": final_state, "success": True})
-
-        return {"success": True, "script_path": script_path, "results": results, "state": final_state}
+        self.session.update_state(result["state"])
+        self.session.record_command(result.get("command", f"-target-attach {pid}"), result)
+        return result
         
     def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
         """Run the loaded binary; return raw responses"""
