@@ -133,6 +133,8 @@ async def attach(pid: int) -> Dict[str, Any]:
 
     :param pid: Process ID to attach to
     :returns: Attach status and initial context if stopped
+    
+    A script is attach for `attach()`, you do not have to preset environment
     """
     result = pwndbg_tools.attach(pid)
     return result
