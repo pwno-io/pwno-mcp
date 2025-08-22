@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      platform: linux/amd64
+      # platform: linux/amd64
     image: pwno-mcp:latest
     container_name: pwno-mcp-server
     

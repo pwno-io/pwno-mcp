@@ -39,27 +39,13 @@ stateful system for autonomous `pwn` and binary research, designed for LLMs agen
 
 ## Installation
 
-### From Source
-
-```bash
-git clone https://github.com/your-org/pwno-mcp.git
-cd pwno-mcp
-pip install -e .
-```
-
-### Using pip
-
-```bash
-pip install pwno-mcp
-```
-
 ### Using Docker
 
 Build and run with Docker:
 
 ```bash
 # Build the image
-docker build -t pwno-mcp:latest .
+docker build -t pwno-mcp:latest . --platform linux/amd64
 
 # Run with required capabilities
 docker run -it \
