@@ -195,7 +195,12 @@ class SubprocessTools:
             pid: Process ID to check
             
         Returns:
-            Dictionary with process status
+            Dictionary with process status. When available, includes live
+            standard stream contents as strings:
+            - ``stdout``: accumulated standard output so far
+            - ``stderr``: accumulated standard error so far
+            Paths to the backing log files (``stdout_path``, ``stderr_path``)
+            are also returned for external tailing.
         """
         try:
             # Check if we're tracking this process
@@ -206,12 +211,33 @@ class SubprocessTools:
                 
                 if poll_result is None:
                     # Still running, return status and output paths
+                    # Flush current buffers and read accumulated outputs
+                    try:
+                        entry['stdout_file'].flush()
+                    except Exception:
+                        pass
+                    try:
+                        entry['stderr_file'].flush()
+                    except Exception:
+                        pass
+                    try:
+                        with open(entry['stdout_path'], 'r', encoding='utf-8', errors='ignore') as f:
+                            live_stdout = f.read()
+                    except Exception:
+                        live_stdout = ''
+                    try:
+                        with open(entry['stderr_path'], 'r', encoding='utf-8', errors='ignore') as f:
+                            live_stderr = f.read()
+                    except Exception:
+                        live_stderr = ''
                     return {
                         'success': True,
                         'pid': pid,
                         'status': 'running',
                         'stdout_path': entry['stdout_path'],
                         'stderr_path': entry['stderr_path'],
+                        'stdout': live_stdout,
+                        'stderr': live_stderr,
                         'cpu_percent': psutil.Process(pid).cpu_percent(),
                         'memory_info': psutil.Process(pid).memory_info()._asdict()
                     }
