@@ -57,7 +57,7 @@ RUN uv sync
 RUN mkdir -p /tmp/pwno_python_workspace && \
     uv venv /tmp/pwno_python_workspace/shared_venv && \
     uv pip install --python /tmp/pwno_python_workspace/shared_venv \
-      requests numpy ipython hexdump pwntools
+      requests numpy ipython hexdump pwntools pwncli
 
 EXPOSE 5500
 ENTRYPOINT ["/bin/bash"] 
