@@ -98,12 +98,8 @@ class SessionState:
         return False
         
     def record_command(self, command: str, result: Dict[str, Any]):
-        """Record a command and its result in history"""
-        self.command_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "command": command,
-            "result": result
-        })
+        """No-op: command history disabled for performance"""
+        return
         
     def update_state(self, new_state: str):
         """Update the process state"""

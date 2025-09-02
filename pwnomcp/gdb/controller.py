@@ -53,12 +53,20 @@ class GdbController:
         # else:
         #     logger.warning("No .gdbinit found")
             
-        # Enable MI asynchronous mode so that execution commands are non-blocking
-        mi_async_set = self.execute_mi_command("set mi-async on")
-        results.append(mi_async_set)
-        
-        pwndbg_check = self.execute_command("pwndbg")
-        results.append(pwndbg_check)
+        # Core GDB settings via MI (-gdb-set) for reliable, fast non-interactive behavior
+        for setting in [
+            "-gdb-set mi-async on",
+            "-gdb-set pagination off",
+            "-gdb-set confirm off",
+            "-gdb-set detach-on-fork off",
+            "-gdb-set follow-fork-mode parent",
+            "-gdb-set follow-exec-mode same",
+        ]:
+            results.append(self.execute_mi_command(setting))
+
+        # Ensure pwndbg is active (optional; comment out if too slow in your env)
+        # pwndbg_check = self.execute_command("pwndbg")
+        # results.append(pwndbg_check)
         
         self._initialized = True
         return {
@@ -66,84 +74,38 @@ class GdbController:
             "messages": results
         }
         
-    def execute_mi_command(self, command: str, timeout_sec: float = 10.0) -> Dict[str, Any]:
-        """
-        Execute a GDB/MI command and return raw MI responses.
-
-        Args:
-            command: GDB/MI command to execute (should start with -)
-            timeout_sec: Timeout for command execution
-
-        Returns:
-            Dictionary with raw MI responses, success flag, and current state.
-        """
+    def execute_mi_command(self, command: str) -> Dict[str, Any]:
+        """Execute a GDB/MI command and return raw MI responses."""
         logger.debug(f"Executing MI command: {command}")
-
-        responses = self.controller.write(command, timeout_sec=timeout_sec)
-
-        # Update internal state from notify messages
-        success = False
+        responses = self.controller.write(command)
+        # Update internal state from notify messages and detect errors
         error_found = False
         for response in responses:
             if response.get("type") == "notify":
                 self._handle_notify(response)
-            elif response.get("type") == "result":
-                msg = response.get("message")
-                if msg == "error":
-                    error_found = True
-                if msg in ("done", "running"):
-                    success = True
-
-        if error_found:
-            success = False
-
+            elif response.get("type") == "result" and response.get("message") == "error":
+                error_found = True
         return {
             "command": command,
             "responses": responses,
-            "success": success,
+            "success": not error_found,
             "state": self._state,
         }
         
-    def execute_command(self, command: str, timeout_sec: float = 10.0) -> Dict[str, Any]:
-        """
-        Execute a classic GDB command (non-MI) and return raw responses.
-
-        Args:
-            command: GDB command to execute
-            timeout_sec: Timeout for command execution
-
-        Returns:
-            Dictionary with raw responses, success flag, and current state.
-        """
+    def execute_command(self, command: str) -> Dict[str, Any]:
+        """Execute a classic GDB command (non-MI) and return raw responses."""
         logger.debug(f"Executing command: {command}")
-
-        # Send command and manually collect responses
-        self.controller.write(command, read_response=False)
-
-        collected: list[dict] = []
-        while True:
-            responses = self.controller.get_gdb_response(
-                timeout_sec=timeout_sec,
-                raise_error_on_timeout=False
-            )
-            if not responses:
-                break
-            for response in responses:
-                collected.append(response)
-                if response.get("type") == "notify":
-                    self._handle_notify(response)
-
-        # Determine success: no explicit error result messages
-        success = True
-        for r in collected:
-            if r.get("type") == "result" and r.get("message") == "error":
-                success = False
-                break
-
+        responses = self.controller.write(command)
+        error_found = False
+        for response in responses:
+            if response.get("type") == "notify":
+                self._handle_notify(response)
+            elif response.get("type") == "result" and response.get("message") == "error":
+                error_found = True
         return {
             "command": command,
-            "responses": collected,
-            "success": success,
+            "responses": responses,
+            "success": not error_found,
             "state": self._state,
         }
         
@@ -197,12 +159,6 @@ class GdbController:
     
     def attach(self, pid: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Attach to an existing process using MI command (-target-attach)"""
-        self.execute_command("set pagination off")
-        self.execute_command("set confirm off")
-        self.execute_command("set detach-on-fork off")
-        self.execute_command("set follow-fork-mode parent")
-        self.execute_command("set follow-exec-mode same")
-        
         result = self.execute_mi_command(f"-target-attach {pid}")
         if result["success"]:
             self._inferior_pid = pid
@@ -215,6 +171,40 @@ class GdbController:
         context.append(self.get_context("heap"))
         
         return result, context
+
+    def get_registers_mi(self) -> Dict[str, Any]:
+        """Get register values using MI (hex)."""
+        return self.execute_mi_command("-data-list-register-values x")
+
+    def get_backtrace_mi(self) -> Dict[str, Any]:
+        """Get backtrace/frames using MI."""
+        return self.execute_mi_command("-stack-list-frames")
+
+    def get_disassembly_mi(self, length: int = 64) -> Dict[str, Any]:
+        """Disassemble around $pc using MI where supported."""
+        # Mode 1 = mixed source/asm if available; fall back handled by GDB
+        return self.execute_mi_command(f"-data-disassemble -s $pc -e $pc+{length} -- 1")
+
+    def get_quick_context(self) -> Dict[str, Any]:
+        """Collect a lightweight, MI-based context snapshot (fast)."""
+        if self._state != "stopped":
+            return {
+                "command": "quick-context",
+                "responses": [],
+                "success": False,
+                "state": self._state,
+                "error": f"Cannot get context while inferior is {self._state}",
+            }
+        # Return a structured payload with MI results for key views
+        return {
+            "success": True,
+            "state": self._state,
+            "contexts": {
+                "regs": self.get_registers_mi(),
+                "backtrace": self.get_backtrace_mi(),
+                "disasm": self.get_disassembly_mi(),
+            },
+        }
         
     def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
         """Run the loaded program using MI command"""
@@ -278,6 +268,11 @@ class GdbController:
     def read_memory_mi(self, address: str, word_format: str, word_size: int, nr_rows: int, nr_cols: int) -> Dict[str, Any]:
         """Read memory using MI command"""
         mi_command = f"-data-read-memory {address} {word_format} {word_size} {nr_rows} {nr_cols}"
+        return self.execute_mi_command(mi_command)
+
+    def read_memory_bytes(self, address: str, num_bytes: int) -> Dict[str, Any]:
+        """Read raw memory bytes using MI (fast path)."""
+        mi_command = f"-data-read-memory-bytes {address} {num_bytes}"
         return self.execute_mi_command(mi_command)
         
     def list_breakpoints(self) -> Dict[str, Any]:
