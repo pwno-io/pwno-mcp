@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -13,6 +14,7 @@ from pwnomcp.retdec.retdec import RetDecAnalyzer
 
 from pwnomcp.router import health as health_router
 from pwnomcp.router import mcp as mcp_router
+from pwnomcp.router import attach as attach_router
 
 
 logging.basicConfig(
@@ -21,9 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 DEFAULT_WORKSPACE = "/workspace"
-
 
 gdb_controller: Optional[GdbController] = None
 session_state: Optional[SessionState] = None
@@ -92,8 +92,28 @@ def build_app() -> FastAPI:
 
 
 def run_server():
-    app = build_app()
-    uvicorn.run(app, host="0.0.0.0", port=5500)
+    """
+    - Main MCP app on 0.0.0.0:5500
+    - Attach API on 127.0.0.1:5501
+    """
+
+    main_app = build_app()
+    attach_app = attach_router.get_attach_app()
+
+    main_config = uvicorn.Config(main_app, host="0.0.0.0", port=5500, log_level="info")
+    attach_config = uvicorn.Config(attach_app, host="127.0.0.1", port=5501, log_level="info")
+
+    main_server = uvicorn.Server(main_config)
+    attach_server = uvicorn.Server(attach_config)
+
+    async def _serve_both():
+        logger.info("Starting MCP server on 0.0.0.0:5500 and attach server on 127.0.0.1:5501")
+        await asyncio.gather(
+            main_server.serve(),
+            attach_server.serve(),
+        )
+
+    asyncio.run(_serve_both())
 
 
 app = build_app()
