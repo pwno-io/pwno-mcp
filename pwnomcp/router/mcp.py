@@ -165,7 +165,7 @@ async def sendinput(data: str) -> Dict[str, Any]:
     """Send raw input to the active pwncli process' stdin via PwnPipe.
 
     Important:
-        This call does not append a newline. If the target expects a line, include "\n" yourself.
+        This call does not append a newline. If the target expects a line, include "\\n" yourself.
 
     Args:
         data: Raw text to write to stdin.
