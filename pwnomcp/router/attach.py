@@ -24,6 +24,7 @@ class AttachRequest(BaseModel):
     pid: int
     after: Optional[List[str]] = Field(default=None)
     where: Optional[str] = Field(default=None)
+    script_pid: Optional[int] = Field(default=None)
 
 class AttachResponse(BaseModel):
     """Response body for /attach"""
@@ -92,6 +93,7 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
             "success": attach_success,
             "state": attach_result.get("state"),
             "pid": attach_result.get("pid"),
+            "script_pid": body.script_pid,
         }
     except Exception:
         logger.exception("Error attaching to pid %s", body.pid)
