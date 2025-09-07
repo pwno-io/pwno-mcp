@@ -63,6 +63,8 @@ RUN mkdir -p /tmp/pwno_python_workspace && \
     uv pip install --python /tmp/pwno_python_workspace/shared_venv \
       requests numpy ipython hexdump pwntools ropper git+https://github.com/pwno-io/pwnocli.git
 
+ENV PROD=true
+
 EXPOSE 5500
 ENTRYPOINT ["/bin/bash"] 
 # You might be looking for: ["uv", "run", "-m", "pwnomcp"] 
