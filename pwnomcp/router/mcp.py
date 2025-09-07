@@ -112,8 +112,8 @@ async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
       "PWNCLI_ATTACH_RESULT:{...json...}" and exposes it as attachment.result
 
     Args:
-        file: The full contents of a pwncli-style Python script that calls cli_script().
-        argument: Additional CLI arguments after "debug /workspace/target" (e.g., "-vv -b malloc").
+        file: The full contents of a pwncli-style Python script that calls cli_script(). (e.g., interacting I/O with `sa()`, with binary using `ia()`)
+        argument: Additional pwncli arguments after "debug /workspace/target" (e.g., "-vv -b malloc").
 
     Returns:
         {
