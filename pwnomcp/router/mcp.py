@@ -145,6 +145,7 @@ async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
     current_pwnpipe = pipe
 
     # Read whatever is available immediately
+    time.sleep(3) # FIXME:
     output = pipe.release()
     attach_result = pipe.get_attach_result()
 
