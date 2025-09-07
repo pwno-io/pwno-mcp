@@ -4,6 +4,7 @@ import os
 import shlex
 from typing import Optional, Dict, Any, Tuple, List
 from functools import wraps
+import time
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
@@ -452,49 +453,6 @@ async def execute_python_code(
         cwd = DEFAULT_WORKSPACE
     result = python_tools.execute_code(code, cwd, timeout)
     return json.dumps(result, indent=2)
-
-
-@mcp.tool()
-async def solve(
-    script: str,
-    pid_timeout: float = 10.0
-) -> str:
-    """Create and run a temporary Python script in the shared environment.
-
-    Behavior:
-        Writes the script to /workspace/solve.py and runs it with unbuffered output.
-        Captures an inner PID if the script prints a PID marker promptly.
-
-    Args:
-        script: Python code content.
-        pid_timeout: Seconds to wait for an inner PID marker in stdout.
-
-    Returns:
-        JSON string with spawn metadata (pid, logs, optional inner_pid).
-    """
-    try:
-        os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
-        script_path = os.path.join(DEFAULT_WORKSPACE, "solve.py")
-        with open(script_path, "w", encoding="utf-8") as f:
-            f.write(script)
-
-        python_exe = python_tools.get_python_executable()
-        base_cmd = f"{python_exe} -u {shlex.quote(script_path)}"
-        env = {"PYTHONUNBUFFERED": "1"}
-        spawn = subprocess_tools.spawn_process(base_cmd, cwd=DEFAULT_WORKSPACE, env=env)
-        if spawn.get("stdout_path"):
-            pid_capture = subprocess_tools.wait_for_pid_marker(spawn["stdout_path"], timeout=pid_timeout)
-            spawn["inner_pid_lookup"] = pid_capture
-            if pid_capture.get("success") and "pid" in pid_capture:
-                spawn["inner_pid"] = pid_capture["pid"]
-        spawn["script_path"] = script_path
-        spawn["command"] = base_cmd
-        return json.dumps(spawn, indent=2)
-    except Exception as e:
-        return json.dumps({
-            "success": False,
-            "error": str(e)
-        }, indent=2)
 
 
 @mcp.tool()
