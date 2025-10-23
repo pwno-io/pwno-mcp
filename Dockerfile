@@ -65,6 +65,11 @@ RUN mkdir -p /tmp/pwno_python_workspace && \
 
 ENV PROD=true
 
-EXPOSE 5500
-ENTRYPOINT ["/bin/bash"] 
-# You might be looking for: ["uv", "run", "-m", "pwnomcp"] 
+# By default, runs in stdio mode for MCP clients (Claude Desktop, etc.)
+# To run in HTTP mode, set ENV PWNOMCP_HTTP_MODE=1 and uncomment EXPOSE 5500
+# EXPOSE 5500
+
+# Default: stdio mode for MCP clients
+ENTRYPOINT ["uv", "run", "-m", "pwnomcp"]
+# For interactive shell: ["/bin/bash"]
+# For HTTP mode: set ENV PWNOMCP_HTTP_MODE=1 before ENTRYPOINT

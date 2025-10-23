@@ -1,25 +1,23 @@
+import asyncio
 import logging
 import os
-import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI
 import uvicorn
+from fastapi import FastAPI
 
 from pwnomcp.gdb import GdbController
-from pwnomcp.state import SessionState
-from pwnomcp.tools import PwndbgTools, SubprocessTools, GitTools, PythonTools
 from pwnomcp.retdec.retdec import RetDecAnalyzer
-
-from pwnomcp.router import health as health_router
-from pwnomcp.router import mcp as mcp_router
 from pwnomcp.router import attach as attach_router
+from pwnomcp.router import mcp as mcp_router
+from pwnomcp.state import SessionState
+from pwnomcp.tools import GitTools, PwndbgTools, PythonTools, SubprocessTools
 
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -33,33 +31,31 @@ git_tools: Optional[GitTools] = None
 python_tools: Optional[PythonTools] = None
 retdec_analyzer: Optional[RetDecAnalyzer] = None
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
 
-    logger.info("Initializing Pwno MCP server...")
+def _initialize_components() -> None:
+    """Initialize all MCP components and share the runtime context with FastMCP."""
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
 
     if not os.path.exists(DEFAULT_WORKSPACE):
         try:
             os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
-            logger.info(f"Created default workspace directory: {DEFAULT_WORKSPACE}")
-        except OSError as e:
-            logger.warning(f"Could not create workspace directory {DEFAULT_WORKSPACE}: {e}")
+            logger.info("Created default workspace directory: %s", DEFAULT_WORKSPACE)
+        except OSError as exc:
+            logger.warning("Could not create workspace directory %s: %s", DEFAULT_WORKSPACE, exc)
             logger.info("Continuing without default workspace directory")
 
-    gdb_controller      = GdbController()
-    session_state       = SessionState()
-    pwndbg_tools        = PwndbgTools(gdb_controller, session_state)
-    subprocess_tools    = SubprocessTools()
-    git_tools           = GitTools()
-    python_tools        = PythonTools()
-    retdec_analyzer     = RetDecAnalyzer()
+    gdb_controller = GdbController()
+    session_state = SessionState()
+    pwndbg_tools = PwndbgTools(gdb_controller, session_state)
+    subprocess_tools = SubprocessTools()
+    git_tools = GitTools()
+    python_tools = PythonTools()
+    retdec_analyzer = RetDecAnalyzer()
 
     init_result = gdb_controller.initialize()
-    logger.info(f"GDB initialization: {init_result['status']}")
+    logger.info("GDB initialization: %s", init_result["status"])
     logger.info("RetDec analyzer created (lazy initialization)")
 
-    # Provide the runtime context to the MCP tools module
     mcp_router.set_runtime_context(
         gdb_controller,
         session_state,
@@ -70,7 +66,12 @@ async def lifespan(app: FastAPI):
         retdec_analyzer,
     )
 
-    # Run the MCP session manager lifecycle
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Initializing Pwno MCP server (HTTP mode)...")
+    _initialize_components()
+
     async with mcp_router.mcp.session_manager.run():
         yield
 
@@ -91,15 +92,27 @@ def build_app() -> FastAPI:
     return app
 
 
-def run_server(host: str = "0.0.0.0", port: int = 5500, attach_host: str = "127.0.0.1", attach_port: int = 5501):
-    """
-    Run the Pwno MCP server.
+def run_stdio() -> None:
+    """Run MCP server in stdio mode for MCP clients (Claude Desktop, etc.)."""
+    logger.info("Initializing Pwno MCP server (stdio mode)...")
+    _initialize_components()
+    logger.info("Starting MCP server in stdio mode...")
+    mcp_router.mcp.run()
 
-    Args:
-        host: Host address for the main MCP server (default: 0.0.0.0)
-        port: Port for the main MCP server (default: 5500)
-        attach_host: Host address for the attach API server (default: 127.0.0.1)
-        attach_port: Port for the attach API server (default: 5501)
+
+def run_server(
+    host: str = "0.0.0.0",
+    port: int = 5500,
+    attach_host: str = "127.0.0.1",
+    attach_port: int = 5501,
+) -> None:
+    """
+    Run the Pwno MCP server over HTTP while also exposing the attach API.
+
+    :param host: Host address for the main MCP server.
+    :param port: Port for the main MCP server.
+    :param attach_host: Host address for the attach API server.
+    :param attach_port: Port for the attach API server.
     """
     main_app = build_app()
     attach_app = attach_router.get_attach_app()
@@ -111,7 +124,13 @@ def run_server(host: str = "0.0.0.0", port: int = 5500, attach_host: str = "127.
     attach_server = uvicorn.Server(attach_config)
 
     async def _serve_both():
-        logger.info(f"Starting MCP server on {host}:{port} and attach server on {attach_host}:{attach_port}")
+        logger.info(
+            "Starting MCP server on %s:%s and attach server on %s:%s",
+            host,
+            port,
+            attach_host,
+            attach_port,
+        )
         await asyncio.gather(
             main_server.serve(),
             attach_server.serve(),
