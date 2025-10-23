@@ -91,6 +91,52 @@ def build_app() -> FastAPI:
     return app
 
 
+def run_stdio():
+    """
+    Run MCP server in stdio mode for MCP clients (Claude Desktop, etc.)
+    """
+    from pwnomcp.router import mcp as mcp_router
+
+    # Initialize the runtime context manually for stdio mode
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
+
+    logger.info("Initializing Pwno MCP server in stdio mode...")
+
+    if not os.path.exists(DEFAULT_WORKSPACE):
+        try:
+            os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
+            logger.info(f"Created default workspace directory: {DEFAULT_WORKSPACE}")
+        except OSError as e:
+            logger.warning(f"Could not create workspace directory {DEFAULT_WORKSPACE}: {e}")
+
+    gdb_controller      = GdbController()
+    session_state       = SessionState()
+    pwndbg_tools        = PwndbgTools(gdb_controller, session_state)
+    subprocess_tools    = SubprocessTools()
+    git_tools           = GitTools()
+    python_tools        = PythonTools()
+    retdec_analyzer     = RetDecAnalyzer()
+
+    init_result = gdb_controller.initialize()
+    logger.info(f"GDB initialization: {init_result['status']}")
+    logger.info("RetDec analyzer created (lazy initialization)")
+
+    # Set runtime context for MCP tools
+    mcp_router.set_runtime_context(
+        gdb_controller,
+        session_state,
+        pwndbg_tools,
+        subprocess_tools,
+        git_tools,
+        python_tools,
+        retdec_analyzer,
+    )
+
+    # Run in stdio mode
+    logger.info("Starting MCP server in stdio mode...")
+    mcp_router.mcp.run()
+
+
 def run_server():
     """
     - Main MCP app on 0.0.0.0:5500
