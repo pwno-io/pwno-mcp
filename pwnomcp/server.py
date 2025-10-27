@@ -33,7 +33,12 @@ retdec_analyzer: Optional[RetDecAnalyzer] = None
 
 
 def _initialize_components() -> None:
-    """Initialize all MCP components and share the runtime context with FastMCP."""
+    """
+    Initialize all MCP components and set up the runtime context.
+
+    This helper is shared between HTTP mode (FastAPI lifespan) and stdio mode so
+    both transports share identical initialization semantics.
+    """
     global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
 
     if not os.path.exists(DEFAULT_WORKSPACE):
@@ -70,6 +75,7 @@ def _initialize_components() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing Pwno MCP server (HTTP mode)...")
+
     _initialize_components()
 
     async with mcp_router.mcp.session_manager.run():
@@ -93,7 +99,12 @@ def build_app() -> FastAPI:
 
 
 def run_stdio() -> None:
-    """Run MCP server in stdio mode for MCP clients (Claude Desktop, etc.)."""
+    """
+    Run Pwno MCP in stdio mode for MCP clients (Claude Desktop, etc.).
+
+    This path keeps the initialization consistent with HTTP mode but swaps the
+    transport for a stdio driver expected by MCP-aware desktop agents.
+    """
     logger.info("Initializing Pwno MCP server (stdio mode)...")
     _initialize_components()
     logger.info("Starting MCP server in stdio mode...")
@@ -107,10 +118,10 @@ def run_server(
     attach_port: int = 5501,
 ) -> None:
     """
-    Run the Pwno MCP server over HTTP while also exposing the attach API.
+    Run the Pwno MCP FastAPI server and the attach API concurrently.
 
-    :param host: Host address for the main MCP server.
-    :param port: Port for the main MCP server.
+    :param host: Host address for the HTTP MCP server.
+    :param port: Port for the HTTP MCP server.
     :param attach_host: Host address for the attach API server.
     :param attach_port: Port for the attach API server.
     """

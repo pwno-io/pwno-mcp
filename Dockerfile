@@ -65,11 +65,8 @@ RUN mkdir -p /tmp/pwno_python_workspace && \
 
 ENV PROD=true
 
-# By default, runs in stdio mode for MCP clients (Claude Desktop, etc.)
-# To run in HTTP mode, set ENV PWNOMCP_HTTP_MODE=1 and uncomment EXPOSE 5500
-# EXPOSE 5500
-
-# Default: stdio mode for MCP clients
-ENTRYPOINT ["uv", "run", "-m", "pwnomcp"]
-# For interactive shell: ["/bin/bash"]
-# For HTTP mode: set ENV PWNOMCP_HTTP_MODE=1 before ENTRYPOINT
+EXPOSE 5500
+# For Firecracker VM: systemd boots as PID 1 and starts pwnomcp.service
+ENTRYPOINT ["/bin/bash"]
+# For stdio mode (Claude Desktop, etc.): ["uv", "run", "-m", "pwnomcp"]
+# For HTTP mode: ["uv", "run", "-m", "pwnomcp", "--http"]
