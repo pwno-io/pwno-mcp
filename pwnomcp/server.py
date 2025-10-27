@@ -33,12 +33,17 @@ git_tools: Optional[GitTools] = None
 python_tools: Optional[PythonTools] = None
 retdec_analyzer: Optional[RetDecAnalyzer] = None
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+
+def _initialize_components():
+    """
+    Initialize all MCP components and set up the runtime context.
+
+    This function is shared between HTTP mode (lifespan) and stdio mode (run_stdio)
+    to ensure consistent initialization across different transport modes.
+    """
     global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
 
-    logger.info("Initializing Pwno MCP server...")
-
+    # Ensure workspace directory exists
     if not os.path.exists(DEFAULT_WORKSPACE):
         try:
             os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
@@ -47,19 +52,21 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Could not create workspace directory {DEFAULT_WORKSPACE}: {e}")
             logger.info("Continuing without default workspace directory")
 
-    gdb_controller      = GdbController()
-    session_state       = SessionState()
-    pwndbg_tools        = PwndbgTools(gdb_controller, session_state)
-    subprocess_tools    = SubprocessTools()
-    git_tools           = GitTools()
-    python_tools        = PythonTools()
-    retdec_analyzer     = RetDecAnalyzer()
+    # Initialize all components
+    gdb_controller   = GdbController()
+    session_state    = SessionState()
+    pwndbg_tools     = PwndbgTools(gdb_controller, session_state)
+    subprocess_tools = SubprocessTools()
+    git_tools        = GitTools()
+    python_tools     = PythonTools()
+    retdec_analyzer  = RetDecAnalyzer()
 
+    # Initialize GDB
     init_result = gdb_controller.initialize()
     logger.info(f"GDB initialization: {init_result['status']}")
     logger.info("RetDec analyzer created (lazy initialization)")
 
-    # Provide the runtime context to the MCP tools module
+    # Set runtime context for MCP router
     mcp_router.set_runtime_context(
         gdb_controller,
         session_state,
@@ -69,6 +76,14 @@ async def lifespan(app: FastAPI):
         python_tools,
         retdec_analyzer,
     )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Initializing Pwno MCP server (HTTP mode)...")
+
+    # Initialize all components
+    _initialize_components()
 
     # Run the MCP session manager lifecycle
     async with mcp_router.mcp.session_manager.run():
@@ -94,45 +109,16 @@ def build_app() -> FastAPI:
 def run_stdio():
     """
     Run MCP server in stdio mode for MCP clients (Claude Desktop, etc.)
+
+    This mode uses standard input/output for communication, making it suitable
+    for integration with MCP clients like Claude Desktop or other stdio-based tools.
     """
-    from pwnomcp.router import mcp as mcp_router
+    logger.info("Initializing Pwno MCP server (stdio mode)...")
 
-    # Initialize the runtime context manually for stdio mode
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
+    # Initialize all components (shared with HTTP mode)
+    _initialize_components()
 
-    logger.info("Initializing Pwno MCP server in stdio mode...")
-
-    if not os.path.exists(DEFAULT_WORKSPACE):
-        try:
-            os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
-            logger.info(f"Created default workspace directory: {DEFAULT_WORKSPACE}")
-        except OSError as e:
-            logger.warning(f"Could not create workspace directory {DEFAULT_WORKSPACE}: {e}")
-
-    gdb_controller      = GdbController()
-    session_state       = SessionState()
-    pwndbg_tools        = PwndbgTools(gdb_controller, session_state)
-    subprocess_tools    = SubprocessTools()
-    git_tools           = GitTools()
-    python_tools        = PythonTools()
-    retdec_analyzer     = RetDecAnalyzer()
-
-    init_result = gdb_controller.initialize()
-    logger.info(f"GDB initialization: {init_result['status']}")
-    logger.info("RetDec analyzer created (lazy initialization)")
-
-    # Set runtime context for MCP tools
-    mcp_router.set_runtime_context(
-        gdb_controller,
-        session_state,
-        pwndbg_tools,
-        subprocess_tools,
-        git_tools,
-        python_tools,
-        retdec_analyzer,
-    )
-
-    # Run in stdio mode
+    # Start MCP server in stdio mode
     logger.info("Starting MCP server in stdio mode...")
     mcp_router.mcp.run()
 
