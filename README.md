@@ -88,9 +88,60 @@ The Docker image includes:
 
 ### Running the Server
 
+The server supports two modes:
+
+#### stdio Mode (Default - for MCP Clients)
+
+By default, the server runs in stdio mode for MCP clients like Claude Desktop:
+
 ```bash
 python -m pwnomcp
+# or with Docker:
+docker run -i --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
 ```
+
+#### HTTP Mode (for REST API access)
+
+To run in HTTP mode, set the `PWNOMCP_HTTP_MODE` environment variable:
+
+```bash
+PWNOMCP_HTTP_MODE=1 python -m pwnomcp
+# or with Docker:
+docker run -e PWNOMCP_HTTP_MODE=1 -p 5500:5500 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
+```
+
+### Using with Claude Desktop
+
+To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_config.json`:
+
+**On macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+**On Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "pwndbg-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_ADMIN",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--security-opt",
+        "apparmor=unconfined",
+        "-v",
+        "/path/to/your/workspace:/workspace",
+        "pwno-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+Replace `/path/to/your/workspace` with your actual workspace directory path.
 
 ### Docker Deployment
 
