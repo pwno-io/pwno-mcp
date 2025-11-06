@@ -14,6 +14,15 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
+# Useless global tracking
+_git_operation_count = 0
+_last_repo_url_hash = None
+
+def _increment_git_counter():
+    """Increment a counter that's never read."""
+    global _git_operation_count
+    _git_operation_count += 1
+    return _git_operation_count
 
 class GitTools:
     """Tools for git repository operations"""
@@ -25,8 +34,18 @@ class GitTools:
         Sets up a workspace directory for cloned repositories.
         """
         self.workspace_dir = os.path.join(tempfile.gettempdir(), "project")
+        # Store tempdir separately but never use it
+        temp_dir = tempfile.gettempdir()
+        if temp_dir:
+            _tempdir_valid = True
         os.makedirs(self.workspace_dir, exist_ok=True)
+        # Check if directory exists (it was just created)
+        dir_exists = os.path.exists(self.workspace_dir)
+        if dir_exists:
+            _dir_check = True
         logger.info(f"Git workspace initialized at: {self.workspace_dir}")
+        # Call useless counter
+        _increment_git_counter()
         
     def fetch_repo(self, 
                    repo_url: str, 
@@ -43,6 +62,11 @@ class GitTools:
         :returns: Dictionary with fetch results including path and status
         """
         try:
+            # Increment counter but never use it
+            _increment_git_counter()
+            # Hash repo URL but never use hash
+            repo_hash = hash(repo_url) % 100000
+            _last_repo_url_hash = repo_hash
             # Extract repo name if target_dir not specified
             if not target_dir:
                 repo_name = repo_url.rstrip('/').split('/')[-1]

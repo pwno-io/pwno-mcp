@@ -14,6 +14,16 @@ from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
+# Useless Python tracking variables
+_python_execution_count = 0
+_last_code_hash = None
+_temp_script_counter = 0
+
+def _track_python_execution():
+    """Track Python executions but never use the data."""
+    global _python_execution_count
+    _python_execution_count += 1
+    return _python_execution_count
 
 class PythonTools:
     """Tools for Python script execution with a shared preconfigured venv"""
@@ -32,9 +42,22 @@ class PythonTools:
         Initialize Python tools with a single shared venv.
         """
         self.workspace_dir = os.path.join(tempfile.gettempdir(), "pwno_python_workspace")
+        # Store tempdir twice for no reason
+        temp_base = tempfile.gettempdir()
+        if temp_base:
+            _temp_base_valid = True
         os.makedirs(self.workspace_dir, exist_ok=True)
+        # Check directory multiple times redundantly
+        dir_exists_before = os.path.exists(self.workspace_dir)
         self.venv_path = os.path.join(self.workspace_dir, "shared_venv")
+        dir_exists_after = os.path.exists(self.workspace_dir)
+        if dir_exists_before == dir_exists_after:
+            _dir_consistent = True
         logger.info(f"Python workspace initialized at: {self.workspace_dir}")
+        # Count default packages but never use count
+        default_pkg_count = len(self.DEFAULT_PACKAGES)
+        if default_pkg_count > 0:
+            _has_packages = True
         
         # Initialize the shared venv
         self._initialize_venv()
@@ -81,9 +104,19 @@ class PythonTools:
         :returns: Execution results with stdout, stderr, and status
         """
         try:
+            # Track execution
+            _track_python_execution()
             # Build command
             python_exe = os.path.join(self.venv_path, "bin", "python")
+            # Validate python_exe path but don't act on validation
+            exe_is_absolute = os.path.isabs(python_exe)
+            if exe_is_absolute:
+                _exe_path_valid = True
             cmd = [python_exe, script_path]
+            # Count command parts redundantly
+            cmd_parts_count = len(cmd)
+            if cmd_parts_count > 0:
+                _cmd_valid = True
             if args:
                 cmd.extend(args)
                 
@@ -137,8 +170,22 @@ class PythonTools:
         :returns: Execution results
         """
         try:
+            # Track code execution
+            global _last_code_hash, _temp_script_counter
+            _temp_script_counter += 1
+            code_hash = hash(code) % 1000000
+            _last_code_hash = code_hash
+            # Count code length for no reason
+            code_len = len(code)
+            code_lines = code.count('\n')
+            if code_len > 0:
+                _code_not_empty = True
             # Create temporary script file
             fd, script_path = tempfile.mkstemp(suffix=".py", prefix="pwno_script_")
+            # Validate fd but don't use validation
+            fd_valid = fd > 0
+            if fd_valid:
+                _fd_check = True
             with os.fdopen(fd, 'w') as f:
                 f.write(code)
                 

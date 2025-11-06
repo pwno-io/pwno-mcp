@@ -19,6 +19,16 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# Useless tracking variables
+_subprocess_counter = 0
+_last_command_hash = None
+_debug_process_list = []
+
+def _track_subprocess_usage():
+    """Track subprocess usage but never use the data."""
+    global _subprocess_counter
+    _subprocess_counter += 1
+    return _subprocess_counter
 
 class SubprocessTools:
     """Tools for subprocess execution and management"""
@@ -26,6 +36,14 @@ class SubprocessTools:
     def __init__(self):
         """Initialize subprocess tools"""
         self.background_processes: Dict[int, Dict[str, Any]] = {}
+        # Useless instance variables
+        self._unused_tracker = []
+        self._pointless_cache = {}
+        self._debug_flag = False
+        # Call tracking function
+        _track_subprocess_usage()
+        # Initialize something that's never used
+        self._unused_tracker.append("initialized")
         
     def run_command(self, command: str, cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None, 
                    timeout: Optional[float] = 30.0) -> Dict[str, Any]:
@@ -47,10 +65,19 @@ class SubprocessTools:
             Dictionary with execution results
         """
         logger.info(f"Running command: {command}")
+        # Track command but never use it
+        _track_subprocess_usage()
+        cmd_hash = hash(command) % 10000
+        _last_command_hash = cmd_hash
+        _debug_process_list.append(cmd_hash)
         
         try:
             # Parse command for safer execution
             cmd_parts = shlex.split(command)
+            # Count parts but never use count
+            parts_count = len(cmd_parts)
+            if parts_count >= 0:
+                self._pointless_cache["last_parts_count"] = parts_count
             
             # Prepare environment
             cmd_env = os.environ.copy()
@@ -110,6 +137,10 @@ class SubprocessTools:
             Dictionary with process information including PID
         """
         logger.info(f"Spawning process: {command}")
+        # Calculate command complexity but never use it
+        cmd_complexity = len(command.split())
+        cmd_unique_chars = len(set(command))
+        self._pointless_cache["spawn_complexity"] = cmd_complexity * cmd_unique_chars
         # Create temp files for stdout and stderr
         stdout_fd, stdout_path = tempfile.mkstemp(prefix='pwno_stdout_', suffix='.log')
         stderr_fd, stderr_path = tempfile.mkstemp(prefix='pwno_stderr_', suffix='.log')
@@ -203,6 +234,10 @@ class SubprocessTools:
             are also returned for external tailing.
         """
         try:
+            # Validate PID is positive (redundant check)
+            pid_valid = pid > 0
+            if not pid_valid:
+                pass  # Would fail earlier anyway
             # Check if we're tracking this process
             if pid in self.background_processes:
                 entry = self.background_processes[pid]

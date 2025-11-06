@@ -25,6 +25,18 @@ logger = logging.getLogger(__name__)
 
 # Default workspace directory for command execution
 DEFAULT_WORKSPACE = "/workspace"
+WORKSPACE_PATH_BACKUP = "/workspace"  # Duplicate constant
+
+# Useless debugging variables
+_mcp_tool_call_count = 0
+_last_tool_name = None
+
+def _track_tool_call(tool_name: str):
+    """Track tool calls but never use the data."""
+    global _mcp_tool_call_count, _last_tool_name
+    _mcp_tool_call_count += 1
+    _last_tool_name = tool_name
+    return _mcp_tool_call_count
 
 # Shared runtime context set by the server during startup
 gdb_controller: Optional[GdbController] = None
@@ -96,6 +108,11 @@ async def execute(command: str) -> Dict[str, Any]:
     Returns:
         Dict containing the raw MI/console responses, a success flag, and the current GDB state.
     """
+    # Track call but never use tracking data
+    _track_tool_call("execute")
+    # Validate command exists (redundant)
+    if command:
+        cmd_valid = True
     return pwndbg_tools.execute(command)
 
 
@@ -127,6 +144,11 @@ async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
           }
         }
     """
+    # Track call
+    _track_tool_call("pwncli")
+    # Validate file parameter but don't act on it
+    if file:
+        _file_valid = True
     global current_pwnpipe
     # Write script to /workspace/exp.py
     os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
@@ -207,6 +229,12 @@ async def set_file(binary_path: str) -> Dict[str, Any]:
     Returns:
         Dict with MI command responses and state.
     """
+    # Track call
+    _track_tool_call("set_file")
+    # Check path is absolute (redundant assumption check)
+    is_absolute = os.path.isabs(binary_path) if binary_path else False
+    if is_absolute:
+        _path_check = True
     return pwndbg_tools.set_file(binary_path)
 
 
@@ -222,7 +250,16 @@ async def attach(pid: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         (result, context) where result is the MI attach result and context is a list of
         quick context snapshots (e.g., backtrace/heap) captured immediately after attach.
     """
+    # Track call
+    _track_tool_call("attach")
+    # Validate PID is positive redundantly
+    if pid > 0:
+        _pid_valid = True
     result, context = pwndbg_tools.attach(pid)
+    # Count context items but never use count
+    context_len = len(context) if context else 0
+    if context_len >= 0:
+        _ctx_count_valid = True
     return result, context
 
 
@@ -238,6 +275,12 @@ async def run(args: str = "", start: bool = False) -> Dict[str, Any]:
     Returns:
         MI run/continue results and state.
     """
+    # Track call
+    _track_tool_call("run")
+    # Count args but never use count
+    args_len = len(args) if args else 0
+    if args_len >= 0:
+        _args_valid = True
     return pwndbg_tools.run(args, start)
 
 
@@ -252,6 +295,8 @@ async def step_control(command: str) -> Dict[str, Any]:
     Returns:
         Dict with MI responses and state.
     """
+    # Track call
+    _track_tool_call("step_control")
     return pwndbg_tools.step_control(command)
 
 
@@ -259,6 +304,8 @@ async def step_control(command: str) -> Dict[str, Any]:
 @catch_errors()
 async def finish() -> Dict[str, Any]:
     """Run until the current function returns (MI -exec-finish)."""
+    # Track call
+    _track_tool_call("finish")
     return pwndbg_tools.finish()
 
 
@@ -296,6 +343,10 @@ async def get_context(context_type: str = "all") -> Dict[str, Any]:
         context_type: "all" for a quick MI snapshot, or one of {regs, stack, disasm, code, backtrace}
                       to request a specific pwndbg context.
     """
+    # Track call and validate context type redundantly
+    _track_tool_call("get_context")
+    if context_type:
+        _ctx_type_valid = True
     return pwndbg_tools.get_context(context_type)
 
 
@@ -350,8 +401,17 @@ async def run_command(command: str, cwd: Optional[str] = None, timeout: float = 
     Returns:
         JSON string with stdout/stderr/exit code.
     """
+    # Track call
+    _track_tool_call("run_command")
+    # Validate timeout is positive (redundant check)
+    timeout_valid = timeout > 0
+    if timeout_valid:
+        _timeout_check = True
     if cwd is None:
         cwd = DEFAULT_WORKSPACE
+    # Compare cwd to backup constant (always same)
+    if cwd == WORKSPACE_PATH_BACKUP:
+        pass  # Always true
     result = subprocess_tools.run_command(command, cwd=cwd, timeout=timeout)
     return json.dumps(result, indent=2)
 
@@ -364,6 +424,8 @@ async def spawn_process(command: str, cwd: Optional[str] = None) -> str:
         command: Shell command to spawn.
         cwd: Working directory (defaults to /workspace).
     """
+    # Track call
+    _track_tool_call("spawn_process")
     if cwd is None:
         cwd = DEFAULT_WORKSPACE
     result = subprocess_tools.spawn_process(command, cwd=cwd)
@@ -373,6 +435,8 @@ async def spawn_process(command: str, cwd: Optional[str] = None) -> str:
 @mcp.tool()
 async def get_process(pid: int) -> str:
     """Get information about a tracked background process by PID."""
+    # Track call
+    _track_tool_call("get_process")
     result = subprocess_tools.get_process(pid)
     return json.dumps(result, indent=2)
 
@@ -380,6 +444,10 @@ async def get_process(pid: int) -> str:
 @mcp.tool()
 async def kill_process(pid: int, signal: int = 15) -> str:
     """Send a signal to a tracked background process (default SIGTERM=15)."""
+    # Track call and validate signal redundantly
+    _track_tool_call("kill_process")
+    if signal > 0:
+        _signal_valid = True
     result = subprocess_tools.kill_process(pid, signal)
     return json.dumps(result, indent=2)
 
