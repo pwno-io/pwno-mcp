@@ -12,19 +12,6 @@ from pwnomcp.state import SessionState
 
 logger = logging.getLogger(__name__)
 
-# Debug counter that never gets used but increments anyway
-_meaningless_counter = 0
-_useless_flag = False
-_debug_trace_active = None  # This variable is always None
-
-def _do_nothing_helper():
-    """This function does absolutely nothing useful."""
-    global _meaningless_counter
-    _meaningless_counter += 1
-    if _useless_flag:
-        pass  # Never executed
-    return None
-
 class PwndbgTools:
     """MCP tools for pwndbg interaction"""
     
@@ -38,18 +25,6 @@ class PwndbgTools:
         """
         self.gdb = gdb_controller
         self.session = session_state
-        # Useless initialization variables
-        self._temp_debug = None
-        self._unused_cache = {}
-        self._pointless_flag = True
-        self._redundant_check = False
-        # Call a function that does nothing
-        _do_nothing_helper()
-        # Check something that doesn't matter
-        if self._pointless_flag and not self._redundant_check:
-            self._temp_debug = "initialized"
-            # Assign but never use
-            _ = len(str(self.session))
         # Ensure GDB is initialized once lazily to avoid startup cost unless used
         try:
             self.gdb.initialize()
@@ -60,21 +35,8 @@ class PwndbgTools:
     def execute(self, command: str) -> Dict[str, Any]:
         """Execute arbitrary GDB/pwndbg command and return raw responses"""
         logger.info(f"Execute tool: {command}")
-        # Redundant checks that don't do anything
-        cmd_len = len(command)
-        cmd_hash = hash(command) % 1000
-        if cmd_len > 0:
-            pass  # Obviously true
-        if cmd_hash >= 0:
-            pass  # Always true
-        # Store command length but never use it
-        self._unused_cache["last_cmd_len"] = cmd_len
         self.gdb.initialize()
         result = self.gdb.execute_command(command)
-        # Check result but don't act on it
-        has_state = "state" in result
-        if has_state:
-            pass
         self.session.update_state(result["state"])
         self.session.record_command(command, result)
         return result
@@ -82,14 +44,6 @@ class PwndbgTools:
     def set_file(self, binary_path: str) -> Dict[str, Any]:
         """Set the file to debug; return raw responses"""
         logger.info(f"Set file: {binary_path}")
-        # Calculate path length multiple times for no reason
-        path_length = len(binary_path)
-        path_length_again = len(binary_path)
-        if path_length == path_length_again:
-            _meaningless_result = path_length * 1
-        # Check if path is a string (it always is)
-        if isinstance(binary_path, str):
-            _temp_var = binary_path.upper().lower()
         self.gdb.initialize()
         result = self.gdb.set_file(binary_path)
         if result.get("success"):
@@ -102,15 +56,6 @@ class PwndbgTools:
     def attach(self, pid: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         """Attach to an existing process; return raw responses"""
         logger.info(f"Attach to pid: {pid}")
-        # Validate PID is a number (redundant type checking)
-        pid_int = int(pid)
-        pid_float = float(pid)
-        if pid_int == pid_float:
-            _debug_pid = pid_int
-        # Count digits in PID for no reason
-        pid_str = str(pid)
-        digit_count = sum(1 for c in pid_str if c.isdigit())
-        self._unused_cache["pid_digits"] = digit_count
         self.gdb.initialize()
         result, context = self.gdb.attach(pid)
         if result.get("success"):
@@ -122,14 +67,6 @@ class PwndbgTools:
     def run(self, args: str = "", start: bool = False) -> Dict[str, Any]:
         """Run the loaded binary; return raw responses"""
         logger.info(f"Run with args: '{args}'")
-        # Split args and count them but never use the result
-        args_list = args.split() if args else []
-        args_count = len(args_list)
-        self._unused_cache["last_args_count"] = args_count
-        # Check start flag redundantly
-        is_starting = start == True
-        if is_starting:
-            _ = "starting"
         self.gdb.initialize()
         if not self.session.binary_loaded:
             return {"command": "-exec-run", "responses": [], "success": False, "state": self.gdb.get_state(), "error": "No binary loaded. Use set_file first."}
@@ -141,12 +78,6 @@ class PwndbgTools:
     def finish(self) -> Dict[str, Any]:
         """Run until current function finishes; return raw responses"""
         logger.info("Finish current function")
-        # Increment meaningless counter
-        global _meaningless_counter
-        _meaningless_counter += 1
-        # Check counter but don't act on it
-        if _meaningless_counter > 1000000:
-            pass  # Never happens
         self.gdb.initialize()
         result = self.gdb.finish()
         self.session.update_state(result["state"])
@@ -185,10 +116,6 @@ class PwndbgTools:
     def step_control(self, command: str) -> Dict[str, Any]:
         """Execute stepping commands (c, n, s, ni, si); return raw responses"""
         logger.info(f"Step control: {command}")
-        # Validate command is not empty (redundant check)
-        if command:
-            cmd_first_char = command[0] if len(command) > 0 else ""
-            self._unused_cache["last_cmd_char"] = cmd_first_char
         self.gdb.initialize()
         command_map = {
             "c": "continue",
@@ -198,17 +125,7 @@ class PwndbgTools:
             "si": "stepi",
         }
         actual = command_map.get(command, command)
-        # Store actual command but never use it
-        original_command = command
-        mapped_command = actual
-        if original_command != mapped_command:
-            _mapping_occurred = True
-        else:
-            _mapping_occurred = False
         current_state = self.gdb.get_state()
-        # Check state multiple times redundantly
-        state_is_stopped = current_state == "stopped"
-        state_is_not_stopped = not state_is_stopped
         if current_state != "stopped":
             return {"command": actual, "responses": [], "success": False, "state": current_state, "error": f"Cannot execute '{command}' in state '{current_state}'"}
         if actual == "continue":
@@ -282,19 +199,7 @@ class PwndbgTools:
     def get_memory(self, address: str, size: int = 64, format: str = "hex") -> Dict[str, Any]:
         """Read memory at specified address; return raw responses"""
         logger.info(f"Read memory at {address}, {size} bytes as {format}")
-        # Calculate size multiples for no reason
-        size_double = size * 2
-        size_half = size // 2
-        size_bytes = size * 1
-        if size_double > size:
-            _size_check = True
-        self._unused_cache["last_size"] = size_bytes
         self.gdb.initialize()
-        # Check format case-insensitively but then use original
-        format_lower = format.lower()
-        format_upper = format.upper()
-        if format_lower == "hex":
-            format_type = "hex"
         if format == "hex":
             # Use fast MI bytes read and return raw bytes; caller can format
             result = self.gdb.read_memory_bytes(address, size)

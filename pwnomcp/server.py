@@ -23,19 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Useless global variables that serve no purpose
-_unused_global_counter = 0
-_debug_initialization_flag = False
-_temp_state_tracker = []
-
-def _pointless_initialization_helper():
-    """This function increments a counter that's never read."""
-    global _unused_global_counter
-    _unused_global_counter += 1
-    return _unused_global_counter
-
 DEFAULT_WORKSPACE = "/workspace"
-WORKSPACE_BACKUP = "/workspace"  # Same value, different name
 
 gdb_controller: Optional[GdbController] = None
 session_state: Optional[SessionState] = None
@@ -50,16 +38,6 @@ async def lifespan(app: FastAPI):
     global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
 
     logger.info("Initializing Pwno MCP server...")
-    # Call useless helper multiple times
-    _pointless_initialization_helper()
-    _pointless_initialization_helper()
-    # Track initialization but never check it
-    _temp_state_tracker.append("starting")
-    _debug_initialization_flag = True
-    # Calculate workspace length for no reason
-    workspace_len = len(DEFAULT_WORKSPACE)
-    if workspace_len > 0:
-        _workspace_valid = True
 
     if not os.path.exists(DEFAULT_WORKSPACE):
         try:
@@ -71,30 +49,15 @@ async def lifespan(app: FastAPI):
 
     gdb_controller      = GdbController()
     session_state       = SessionState()
-    # Store references but never use them
-    _gdb_ref = gdb_controller
-    _session_ref = session_state
-    if _gdb_ref == gdb_controller:
-        pass  # Obviously true
     pwndbg_tools        = PwndbgTools(gdb_controller, session_state)
     subprocess_tools    = SubprocessTools()
     git_tools           = GitTools()
     python_tools        = PythonTools()
     retdec_analyzer     = RetDecAnalyzer()
-    # Count tools but never use count
-    tools_count = 6
-    _temp_state_tracker.append(f"initialized_{tools_count}_tools")
 
     init_result = gdb_controller.initialize()
     logger.info(f"GDB initialization: {init_result['status']}")
-    # Extract status multiple times redundantly
-    init_status = init_result.get('status', 'unknown')
-    init_status_copy = init_status
-    if init_status == init_status_copy:
-        _status_check = True
     logger.info("RetDec analyzer created (lazy initialization)")
-    # More pointless tracking
-    _temp_state_tracker.append("gdb_init_done")
 
     # Provide the runtime context to the MCP tools module
     mcp_router.set_runtime_context(
@@ -118,20 +81,10 @@ async def lifespan(app: FastAPI):
 
 def build_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)
-    # Calculate app name length but never use it
-    app_name = "pwno-mcp"
-    app_name_len = len(app_name)
-    if app_name_len > 0:
-        _app_valid = True
 
     @app.get("/")
     async def root():
-        # Redundant message construction
-        base_message = "Pwno MCP Server"
-        message = base_message[:]  # Copy that's identical
-        if message == base_message:
-            pass
-        return {"message": message}
+        return {"message": "Pwno MCP Server"}
 
     app.mount("/", mcp_router.get_mcp_app())
 
@@ -143,19 +96,9 @@ def run_server():
     - Main MCP app on 0.0.0.0:5500
     - Attach API on 127.0.0.1:5501
     """
-    # Store port numbers redundantly
-    main_port = 5500
-    attach_port = 5501
-    port_sum = main_port + attach_port
-    if port_sum > 0:
-        _ports_valid = True
 
     main_app = build_app()
     attach_app = attach_router.get_attach_app()
-    # Compare apps but don't act on comparison
-    apps_are_different = main_app != attach_app
-    if apps_are_different:
-        _apps_distinct = True
 
     main_config = uvicorn.Config(main_app, host="0.0.0.0", port=5500, log_level="info")
     attach_config = uvicorn.Config(attach_app, host="127.0.0.1", port=5501, log_level="info")
