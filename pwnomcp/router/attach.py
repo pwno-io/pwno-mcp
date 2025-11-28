@@ -19,12 +19,15 @@ class AttachRequest(BaseModel):
     - pid: target process id to attach
     - after: list of GDB commands to execute after successful attach
     - where: optional binary path to set as debug target before pre (can be skipped if pre-setted)
+    - gdbscript: optional multi-line GDB script to run after a successful attach,
+                 similar to pwntools.gdb.attach(gdbscript=...)
     """
     pre: Optional[List[str]] = Field(default=None)
     pid: int
     after: Optional[List[str]] = Field(default=None)
     where: Optional[str] = Field(default=None)
     script_pid: Optional[int] = Field(default=None)
+    gdbscript: Optional[str] = Field(default=None)
 
 class AttachResponse(BaseModel):
     """Response body for /attach"""
@@ -58,6 +61,15 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
 
     tools = _get_tools()
     command_results: Dict[str, Any] = {}
+
+    # Normalize optional gdbscript into a list of non-empty commands
+    script_commands: List[str] = []
+    if body.gdbscript:
+        script_commands = [
+            line.strip()
+            for line in body.gdbscript.splitlines()
+            if line.strip()
+        ]
 
     # Optionally set the binary file prior to pre-commands
     if body.where:
@@ -100,8 +112,19 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
         attach_success = False
         attach_info = {"success": False, "error": f"failed to attach to pid {body.pid}"}
 
-    # Execute after-attachment commands only if attach succeeded
+    # Execute script and after-attachment commands only if attach succeeded
     if attach_success:
+        # First, run any gdbscript lines provided (post-attach)
+        for cmd in script_commands:
+            try:
+                logger.info("[attach] gdbscript: %s", cmd)
+                res = tools.execute(cmd)
+                logger.info("[attach] gdbscript command result: %s", res)
+                command_results[f"gdbscript:{cmd}"] = res
+            except Exception as e:
+                logger.exception("Error executing gdbscript command: %s", cmd)
+                command_results[f"gdbscript:{cmd}"] = {"success": False, "error": str(e)}
+
         for cmd in body.after or []:
             try:
                 logger.info("[attach] after: %s", cmd)
