@@ -91,23 +91,27 @@ def build_app() -> FastAPI:
     return app
 
 
-def run_server():
+def run_server(host: str = "0.0.0.0", port: int = 5500, attach_host: str = "127.0.0.1", attach_port: int = 5501):
     """
-    - Main MCP app on 0.0.0.0:5500
-    - Attach API on 127.0.0.1:5501
-    """
+    Run the Pwno MCP server.
 
+    Args:
+        host: Host address for the main MCP server (default: 0.0.0.0)
+        port: Port for the main MCP server (default: 5500)
+        attach_host: Host address for the attach API server (default: 127.0.0.1)
+        attach_port: Port for the attach API server (default: 5501)
+    """
     main_app = build_app()
     attach_app = attach_router.get_attach_app()
 
-    main_config = uvicorn.Config(main_app, host="0.0.0.0", port=5500, log_level="info")
-    attach_config = uvicorn.Config(attach_app, host="127.0.0.1", port=5501, log_level="info")
+    main_config = uvicorn.Config(main_app, host=host, port=port, log_level="info")
+    attach_config = uvicorn.Config(attach_app, host=attach_host, port=attach_port, log_level="info")
 
     main_server = uvicorn.Server(main_config)
     attach_server = uvicorn.Server(attach_config)
 
     async def _serve_both():
-        logger.info("Starting MCP server on 0.0.0.0:5500 and attach server on 127.0.0.1:5501")
+        logger.info(f"Starting MCP server on {host}:{port} and attach server on {attach_host}:{attach_port}")
         await asyncio.gather(
             main_server.serve(),
             attach_server.serve(),
