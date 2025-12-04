@@ -16,6 +16,7 @@ dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
     "pwntools>=4.14.1",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
