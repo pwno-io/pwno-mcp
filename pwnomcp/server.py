@@ -22,6 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DEFAULT_WORKSPACE = "/workspace"
+DEFAULT_MOUNT_ROOT = "/"
 
 gdb_controller: Optional[GdbController] = None
 session_state: Optional[SessionState] = None
@@ -72,6 +73,40 @@ def _initialize_components() -> None:
     )
 
 
+def _normalize_mount_root(raw_root: Optional[str]) -> str:
+    """
+    Normalize user-supplied mount prefixes so FastAPI accepts them.
+
+    :param raw_root: User-provided mount root (e.g., "debug/", "/debug").
+    :returns: A normalized path prefix such as "/debug" or the default "/".
+    """
+    if not raw_root:
+        return DEFAULT_MOUNT_ROOT
+    stripped = raw_root.strip()
+    if not stripped or stripped == "/":
+        return DEFAULT_MOUNT_ROOT
+    # Remove surrounding slashes so we can rebuild a canonical path.
+    trimmed = stripped.strip("/")
+    if not trimmed:
+        return DEFAULT_MOUNT_ROOT
+    return f"/{trimmed}"
+
+
+def _mount_under_root(app: FastAPI, mount_root: str) -> FastAPI:
+    """
+    Optionally wrap an ASGI app under a new FastAPI container at mount_root.
+
+    :param app: The FastAPI/ASGI application to expose.
+    :param mount_root: Normalized mount prefix (must start with "/").
+    :returns: The original app if mount_root == "/", otherwise a mounted wrapper.
+    """
+    if mount_root == DEFAULT_MOUNT_ROOT:
+        return app
+    wrapper = FastAPI()
+    wrapper.mount(mount_root, app)
+    return wrapper
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing Pwno MCP server (HTTP mode)...")
@@ -116,6 +151,7 @@ def run_server(
     port: int = 5500,
     attach_host: str = "127.0.0.1",
     attach_port: int = 5501,
+    mount_root: str = DEFAULT_MOUNT_ROOT,
 ) -> None:
     """
     Run the Pwno MCP FastAPI server and the attach API concurrently.
@@ -125,8 +161,13 @@ def run_server(
     :param attach_host: Host address for the attach API server.
     :param attach_port: Port for the attach API server.
     """
-    main_app = build_app()
-    attach_app = attach_router.get_attach_app()
+    normalized_root = _normalize_mount_root(mount_root)
+
+    if normalized_root != DEFAULT_MOUNT_ROOT:
+        logger.info("Mounting MCP and attach apps under prefix: %s", normalized_root)
+
+    main_app = _mount_under_root(build_app(), normalized_root)
+    attach_app = _mount_under_root(attach_router.get_attach_app(), normalized_root)
 
     main_config = uvicorn.Config(main_app, host=host, port=port, log_level="info")
     attach_config = uvicorn.Config(attach_app, host=attach_host, port=attach_port, log_level="info")
