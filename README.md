@@ -110,12 +110,6 @@ PWNOMCP_HTTP_MODE=1 python -m pwnomcp
 docker run -e PWNOMCP_HTTP_MODE=1 -p 5500:5500 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
 ```
 
-Need the HTTP APIs under a sub-path (e.g., `/debug`)? Supply the new CLI flag:
-
-```bash
-PWNOMCP_HTTP_MODE=1 python -m pwnomcp --mount-root debug/
-```
-
 ### Using with Claude Desktop
 
 To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_config.json`:

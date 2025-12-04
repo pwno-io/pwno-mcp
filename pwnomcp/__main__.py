@@ -14,11 +14,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=5500, help="Port for the main MCP server (default: 5500)")
     parser.add_argument("--attach-host", default="127.0.0.1", help="Host address for the attach API server (default: 127.0.0.1)")
     parser.add_argument("--attach-port", type=int, default=5501, help="Port for the attach API server (default: 5501)")
-    parser.add_argument(
-        "--mount-root",
-        default="/",
-        help="Path prefix to mount the MCP and attach apps under (e.g., debug/). Defaults to /.",
-    )
     return parser.parse_args()
 
 
@@ -32,7 +27,6 @@ if __name__ == "__main__":
             port=cli_args.port,
             attach_host=cli_args.attach_host,
             attach_port=cli_args.attach_port,
-            mount_root=cli_args.mount_root,
         )
     else:
         run_stdio()
