@@ -95,7 +95,7 @@ class GdbController:
     def execute_command(self, command: str) -> Dict[str, Any]:
         """Execute a classic GDB command (non-MI) and return raw responses."""
         logger.debug(f"Executing command: {command}")
-        responses = self.controller.write(command)
+        responses = self.controller.write(command, timeout_sec=7.0)
         error_found = False
         for response in responses:
             if response.get("type") == "notify":
