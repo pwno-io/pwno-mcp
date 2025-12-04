@@ -77,7 +77,7 @@ class GdbController:
     def execute_mi_command(self, command: str) -> Dict[str, Any]:
         """Execute a GDB/MI command and return raw MI responses."""
         logger.debug(f"Executing MI command: {command}")
-        responses = self.controller.write(command)
+        responses = self.controller.write(command, timeout_sec=7.0)
         # Update internal state from notify messages and detect errors
         error_found = False
         for response in responses:
