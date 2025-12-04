@@ -66,5 +66,7 @@ RUN mkdir -p /tmp/pwno_python_workspace && \
 ENV PROD=true
 
 EXPOSE 5500
-ENTRYPOINT ["/bin/bash"] 
-# You might be looking for: ["uv", "run", "-m", "pwnomcp"] 
+# For Firecracker VM: systemd boots as PID 1 and starts pwnomcp.service
+ENTRYPOINT ["/bin/bash"]
+# For stdio mode (Claude Desktop, etc.): ["uv", "run", "-m", "pwnomcp"]
+# For HTTP mode: ["uv", "run", "-m", "pwnomcp", "--http"]
