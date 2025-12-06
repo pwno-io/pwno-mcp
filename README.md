@@ -110,6 +110,12 @@ PWNOMCP_HTTP_MODE=1 python -m pwnomcp
 docker run -e PWNOMCP_HTTP_MODE=1 -p 5500:5500 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
 ```
 
+When HTTP mode is enabled the MCP server is hosted directly via `FastMCP.run()`
+using the Streamable HTTP transport. The default endpoint is
+`http://0.0.0.0:5500/debug`, so tools such as Claude Desktop should point at
+that base URL (e.g. `/debug/messages/`). The attach helper API continues to be
+served on `http://127.0.0.1:5501/attach`.
+
 ### Using with Claude Desktop
 
 To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_config.json`:

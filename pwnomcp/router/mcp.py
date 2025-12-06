@@ -63,11 +63,12 @@ def set_runtime_context(
 # Create FastMCP instance (FastAPI app and lifespan managed by server)
 mcp = FastMCP(
     name="pwno-mcp",
+    host="0.0.0.0",
+    port=5500,
+    streamable_http_path="/debug",
     # auth=auth_settings,
     # auth_server_provider=auth_provider
 )
-mcp.settings.host = "0.0.0.0"
-mcp.settings.port = 5500
 
 
 def catch_errors(tuple_on_error: bool = False):
@@ -521,4 +522,4 @@ async def get_decompiled_code() -> str:
 
 
 def get_mcp_app() -> FastAPI:
-    return mcp.streamable_http_app()
+    return mcp
