@@ -90,31 +90,31 @@ The Docker image includes:
 
 The server supports two modes:
 
-#### stdio Mode (Default - for MCP Clients)
+#### HTTP Mode (Default - Streamable HTTP)
 
-By default, the server runs in stdio mode for MCP clients like Claude Desktop:
+Running the module without extra flags starts the Streamable HTTP transport:
 
 ```bash
 python -m pwnomcp
 # or with Docker:
-docker run -i --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
+docker run -p 5500:5500 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
 ```
 
-#### HTTP Mode (for REST API access)
+The MCP server is hosted directly via `FastMCP.run()` using the Streamable HTTP
+transport. The default endpoint is `http://0.0.0.0:5500/debug`, so tools such as
+Claude Desktop should point at that base URL (e.g. `/debug/messages/`). The
+attach helper API continues to be served on `http://127.0.0.1:5501/attach`.
 
-To run in HTTP mode, set the `PWNOMCP_HTTP_MODE` environment variable:
+#### stdio Mode (for MCP Clients)
+
+To use stdio transport (e.g., for Claude Desktop's local integration), pass the
+`--stdio` flag explicitly:
 
 ```bash
-PWNOMCP_HTTP_MODE=1 python -m pwnomcp
+python -m pwnomcp --stdio
 # or with Docker:
-docker run -e PWNOMCP_HTTP_MODE=1 -p 5500:5500 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
+docker run -i --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest --stdio
 ```
-
-When HTTP mode is enabled the MCP server is hosted directly via `FastMCP.run()`
-using the Streamable HTTP transport. The default endpoint is
-`http://0.0.0.0:5500/debug`, so tools such as Claude Desktop should point at
-that base URL (e.g. `/debug/messages/`). The attach helper API continues to be
-served on `http://127.0.0.1:5501/attach`.
 
 ### Using with Claude Desktop
 
