@@ -47,8 +47,17 @@ Build and run with Docker:
 # Build the image
 docker build -t pwno-mcp:latest . --platform linux/amd64
 
-# Run with required capabilities
-docker run -it \
+# Run with required capabilities (HTTP mode by default)
+docker run -p 5500:5500 \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  -v $(pwd)/workspace:/workspace \
+  pwno-mcp:latest
+
+# Open a shell instead of starting the server
+docker run --entrypoint /bin/bash -it \
   --cap-add=SYS_PTRACE \
   --cap-add=SYS_ADMIN \
   --security-opt seccomp=unconfined \
@@ -82,7 +91,7 @@ The Docker image includes:
 
 - GDB with Python support
 - pwndbg installed and configured in `~/.gdbinit`
-- Python 3.8+
+- Python 3.12+
 
 ## Usage
 
@@ -97,7 +106,12 @@ Running the module without extra flags starts the Streamable HTTP transport:
 ```bash
 python -m pwnomcp
 # or with Docker:
-docker run -p 5500:5500 --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest
+docker run -p 5500:5500 \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  pwno-mcp:latest
 ```
 
 The MCP server is hosted directly via `FastMCP.run()` using the Streamable HTTP
@@ -113,7 +127,12 @@ To use stdio transport (e.g., for Claude Desktop's local integration), pass the
 ```bash
 python -m pwnomcp --stdio
 # or with Docker:
-docker run -i --cap-add=SYS_PTRACE --security-opt seccomp=unconfined pwno-mcp:latest --stdio
+docker run -i \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  pwno-mcp:latest --stdio
 ```
 
 ### Using with Claude Desktop
@@ -140,7 +159,8 @@ To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_c
         "apparmor=unconfined",
         "-v",
         "/path/to/your/workspace:/workspace",
-        "pwno-mcp:latest"
+        "pwno-mcp:latest",
+        "--stdio"
       ]
     }
   }
@@ -148,33 +168,6 @@ To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_c
 ```
 
 Replace `/path/to/your/workspace` with your actual workspace directory path.
-
-### Docker Deployment
-
-```dockerfile
-FROM ubuntu:22.04
-
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    gdb \
-    python3 \
-    python3-pip \
-    git \
-    wget
-
-# Install pwndbg
-RUN git clone https://github.com/pwndbg/pwndbg && \
-    cd pwndbg && \
-    ./setup.sh
-
-# Install pwno-mcp
-COPY . /app
-WORKDIR /app
-RUN pip install -e .
-
-# Run the MCP server
-CMD ["python", "-m", "pwnomcp"]
-```
 
 ### MCP Tools
 

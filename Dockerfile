@@ -50,6 +50,7 @@ USER pwno
 
 ENV PYTHONPATH=/app
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 RUN uv sync
 
@@ -67,6 +68,4 @@ ENV PROD=true
 
 EXPOSE 5500
 # For Firecracker VM: systemd boots as PID 1 and starts pwnomcp.service
-ENTRYPOINT ["/bin/bash"]
-# For stdio mode (Claude Desktop, etc.): ["uv", "run", "-m", "pwnomcp"]
-# For HTTP mode: ["uv", "run", "-m", "pwnomcp", "--http"]
+ENTRYPOINT ["/bin/uv", "run", "-m", "pwnomcp"]

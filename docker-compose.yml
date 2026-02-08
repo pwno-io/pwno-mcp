@@ -25,6 +25,10 @@ services:
       - RUST_LOG=info
       - FASTMCP_DEBUG=false
       - FASTMCP_LOG_LEVEL=INFO
+
+    # Expose MCP HTTP port
+    ports:
+      - "5500:5500"
     
     # Volumes for persistent data and workspace
     volumes:
@@ -50,10 +54,6 @@ services:
     
     # Restart policy
     restart: unless-stopped
-    
-    # Stdin/tty for MCP stdio transport
-    stdin_open: true
-    tty: true
     
     # Health check
     healthcheck:

@@ -3,7 +3,7 @@
 Guide for agentic coding tools working in this repository.
 
 ## Repository facts
-- Language: Python (requires 3.13.x; see `pyproject.toml`).
+- Language: Python (requires 3.12+; see `pyproject.toml`).
 - Packaging: `pyproject.toml` + `uv.lock` (uv is used in Docker).
 - Entry point: `python -m pwnomcp` (see `pwnomcp/__main__.py`).
 - Runtime modes: Streamable HTTP (default) and stdio (`--stdio`).
