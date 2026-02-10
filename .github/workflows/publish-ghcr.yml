@@ -35,10 +35,9 @@ jobs:
           tags: |
             type=raw,value=edge,enable={{is_default_branch}}
             type=sha,format=short,enable={{is_default_branch}},prefix=sha-
-            type=semver,pattern={{version}},enable={{is_tag}}
-            type=semver,pattern={{major}}.{{minor}},enable={{is_tag}}
-            type=semver,pattern={{major}},enable={{is_tag}}
-            type=raw,value=latest,enable={{is_tag}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
