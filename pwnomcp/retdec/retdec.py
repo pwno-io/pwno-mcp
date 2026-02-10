@@ -91,7 +91,7 @@ class RetDecAnalyzer:
                     }
                     logger.error(f"RetDec decompilation failed: {response.status_code}")
 
-        except httpx.TimeoutError:
+        except httpx.TimeoutException:
             logger.error("RetDec service timeout")
             self.analysis_result = {
                 "status": "failed",

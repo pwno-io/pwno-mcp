@@ -29,7 +29,7 @@ class GdbController:
             command=[pwnodbg, "--interpreter=mi3", "--quiet"]
         )
         self._initialized = False
-        self._inferior_pid = None
+        self._inferior_pid: Optional[int] = None
         self._state = "idle"  # idle, running, stopped, exited
 
     def initialize(self) -> Dict[str, Any]:

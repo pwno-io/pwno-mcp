@@ -2,6 +2,7 @@ import os
 import logging
 
 logger = logging.getLogger("")
+handler: logging.Handler
 
 prod_env = os.getenv("PROD", False)
 

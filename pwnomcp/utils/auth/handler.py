@@ -7,7 +7,7 @@ Allows access to HTTP headers in MCP tools when running in streamable HTTP mode.
 
 from pathlib import Path
 from typing import Optional
-from mcp.server.auth.provider import OAuthAuthorizationServerProvider, AccessToken
+from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions
 from pydantic import AnyHttpUrl
 from starlette.requests import Request
@@ -15,7 +15,7 @@ from starlette.requests import Request
 from pwnomcp.logger import logger
 
 
-class NonceAuthProvider(OAuthAuthorizationServerProvider):
+class NonceAuthProvider:
     """
     Custom authentication provider that validates X-Nonce header tokens.
 
@@ -29,7 +29,6 @@ class NonceAuthProvider(OAuthAuthorizationServerProvider):
 
         :param nonce_file_path: Path to the file containing the valid nonce
         """
-        super().__init__()
         self.nonce_file_path = nonce_file_path
         self._local_nonce: Optional[str] = None
         self._load_local_nonce()

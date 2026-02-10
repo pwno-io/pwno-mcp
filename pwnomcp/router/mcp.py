@@ -90,6 +90,12 @@ def catch_errors(tuple_on_error: bool = False):
     return decorator
 
 
+def _require_pwndbg_tools() -> PwndbgTools:
+    if not pwndbg_tools:
+        raise RuntimeError("Pwndbg tools not initialized")
+    return pwndbg_tools
+
+
 @mcp.tool()
 @catch_errors()
 async def execute(command: str) -> Dict[str, Any]:
@@ -101,7 +107,7 @@ async def execute(command: str) -> Dict[str, Any]:
     Returns:
         Dict containing the raw MI/console responses, a success flag, and the current GDB state.
     """
-    return pwndbg_tools.execute(command)
+    return _require_pwndbg_tools().execute(command)
 
 
 @mcp.tool()
@@ -212,7 +218,7 @@ async def set_file(binary_path: str) -> Dict[str, Any]:
     Returns:
         Dict with MI command responses and state.
     """
-    return pwndbg_tools.set_file(binary_path)
+    return _require_pwndbg_tools().set_file(binary_path)
 
 
 @mcp.tool()
@@ -227,7 +233,7 @@ async def attach(pid: int) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
         (result, context) where result is the MI attach result and context is a list of
         quick context snapshots (e.g., backtrace/heap) captured immediately after attach.
     """
-    result, context = pwndbg_tools.attach(pid)
+    result, context = _require_pwndbg_tools().attach(pid)
     return result, context
 
 
@@ -243,7 +249,7 @@ async def run(args: str = "", start: bool = False) -> Dict[str, Any]:
     Returns:
         MI run/continue results and state.
     """
-    return pwndbg_tools.run(args, start)
+    return _require_pwndbg_tools().run(args, start)
 
 
 @mcp.tool()
@@ -257,14 +263,14 @@ async def step_control(command: str) -> Dict[str, Any]:
     Returns:
         Dict with MI responses and state.
     """
-    return pwndbg_tools.step_control(command)
+    return _require_pwndbg_tools().step_control(command)
 
 
 @mcp.tool()
 @catch_errors()
 async def finish() -> Dict[str, Any]:
     """Run until the current function returns (MI -exec-finish)."""
-    return pwndbg_tools.finish()
+    return _require_pwndbg_tools().finish()
 
 
 @mcp.tool()
@@ -275,21 +281,21 @@ async def jump(locspec: str) -> Dict[str, Any]:
     Args:
         locspec: Location such as a symbol name, file:line, or address (*0x... ).
     """
-    return pwndbg_tools.jump(locspec)
+    return _require_pwndbg_tools().jump(locspec)
 
 
 @mcp.tool()
 @catch_errors()
 async def return_from_function() -> Dict[str, Any]:
     """Force the current function to return immediately (MI -exec-return)."""
-    return pwndbg_tools.return_from_function()
+    return _require_pwndbg_tools().return_from_function()
 
 
 @mcp.tool()
 @catch_errors()
 async def until(locspec: Optional[str] = None) -> Dict[str, Any]:
     """Run until a specified location or next source line (MI -exec-until)."""
-    return pwndbg_tools.until(locspec)
+    return _require_pwndbg_tools().until(locspec)
 
 
 @mcp.tool()
@@ -301,7 +307,7 @@ async def get_context(context_type: str = "all") -> Dict[str, Any]:
         context_type: "all" for a quick MI snapshot, or one of {regs, stack, disasm, code, backtrace}
                       to request a specific pwndbg context.
     """
-    return pwndbg_tools.get_context(context_type)
+    return _require_pwndbg_tools().get_context(context_type)
 
 
 @mcp.tool()
@@ -315,7 +321,7 @@ async def set_breakpoint(
         location: Breakpoint location (symbol/address/file:line).
         condition: Optional breakpoint condition expression.
     """
-    return pwndbg_tools.set_breakpoint(location, condition)
+    return _require_pwndbg_tools().set_breakpoint(location, condition)
 
 
 @mcp.tool()
@@ -330,14 +336,14 @@ async def get_memory(
         size: Number of bytes to read.
         format: "hex" for raw bytes (fast path), "string" for x/s, otherwise MI grid format.
     """
-    return pwndbg_tools.get_memory(address, size, format)
+    return _require_pwndbg_tools().get_memory(address, size, format)
 
 
 @mcp.tool()
 @catch_errors()
 async def get_session_info() -> Dict[str, Any]:
     """Return current session info (session state + GDB state) without issuing new GDB commands."""
-    return pwndbg_tools.get_session_info()
+    return _require_pwndbg_tools().get_session_info()
 
 
 @mcp.tool()
@@ -357,6 +363,11 @@ async def run_command(
     Returns:
         JSON string with stdout/stderr/exit code.
     """
+    if not subprocess_tools:
+        return json.dumps(
+            {"success": False, "error": "Subprocess tools not initialized"},
+            indent=2,
+        )
     if cwd is None:
         cwd = DEFAULT_WORKSPACE
     result = subprocess_tools.run_command(command, cwd=cwd, timeout=timeout)
@@ -371,6 +382,11 @@ async def spawn_process(command: str, cwd: Optional[str] = None) -> str:
         command: Shell command to spawn.
         cwd: Working directory (defaults to /workspace).
     """
+    if not subprocess_tools:
+        return json.dumps(
+            {"success": False, "error": "Subprocess tools not initialized"},
+            indent=2,
+        )
     if cwd is None:
         cwd = DEFAULT_WORKSPACE
     result = subprocess_tools.spawn_process(command, cwd=cwd)
@@ -380,6 +396,11 @@ async def spawn_process(command: str, cwd: Optional[str] = None) -> str:
 @mcp.tool()
 async def get_process(pid: int) -> str:
     """Get information about a tracked background process by PID."""
+    if not subprocess_tools:
+        return json.dumps(
+            {"success": False, "error": "Subprocess tools not initialized"},
+            indent=2,
+        )
     result = subprocess_tools.get_process(pid)
     return json.dumps(result, indent=2)
 
@@ -387,6 +408,11 @@ async def get_process(pid: int) -> str:
 @mcp.tool()
 async def kill_process(pid: int, signal: int = 15) -> str:
     """Send a signal to a tracked background process (default SIGTERM=15)."""
+    if not subprocess_tools:
+        return json.dumps(
+            {"success": False, "error": "Subprocess tools not initialized"},
+            indent=2,
+        )
     result = subprocess_tools.kill_process(pid, signal)
     return json.dumps(result, indent=2)
 
@@ -394,6 +420,11 @@ async def kill_process(pid: int, signal: int = 15) -> str:
 @mcp.tool()
 async def list_processes() -> str:
     """List all tracked background processes and their metadata (PID, command, log paths)."""
+    if not subprocess_tools:
+        return json.dumps(
+            {"success": False, "error": "Subprocess tools not initialized"},
+            indent=2,
+        )
     result = subprocess_tools.list_processes()
     return json.dumps(result, indent=2)
 
@@ -413,6 +444,10 @@ async def fetch_repo(
         target_dir: Optional specific directory; defaults to a name derived from the URL.
         shallow: Whether to clone shallowly.
     """
+    if not git_tools:
+        return json.dumps(
+            {"success": False, "error": "Git tools not initialized"}, indent=2
+        )
     if target_dir and not os.path.isabs(target_dir):
         target_dir = os.path.join(DEFAULT_WORKSPACE, target_dir)
     elif not target_dir:
@@ -437,6 +472,11 @@ async def execute_python_script(
         cwd: Working directory (default /workspace).
         timeout: Seconds to wait before termination.
     """
+    if not python_tools:
+        return json.dumps(
+            {"success": False, "error": "Python tools not initialized"},
+            indent=2,
+        )
     if cwd is None:
         cwd = DEFAULT_WORKSPACE
     args_list = args.split() if args else None
@@ -455,6 +495,11 @@ async def execute_python_code(
         cwd: Working directory (default /workspace).
         timeout: Seconds to wait before termination.
     """
+    if not python_tools:
+        return json.dumps(
+            {"success": False, "error": "Python tools not initialized"},
+            indent=2,
+        )
     if cwd is None:
         cwd = DEFAULT_WORKSPACE
     result = python_tools.execute_code(code, cwd, timeout)
@@ -469,6 +514,11 @@ async def install_python_packages(packages: str, upgrade: bool = False) -> str:
         packages: Space-separated package list.
         upgrade: If True, perform upgrades when applicable.
     """
+    if not python_tools:
+        return json.dumps(
+            {"success": False, "error": "Python tools not initialized"},
+            indent=2,
+        )
     packages_list = packages.split()
     result = python_tools.install_packages(packages_list, upgrade)
     return json.dumps(result, indent=2)
@@ -477,6 +527,11 @@ async def install_python_packages(packages: str, upgrade: bool = False) -> str:
 @mcp.tool()
 async def list_python_packages() -> str:
     """List all packages installed in the shared Python environment."""
+    if not python_tools:
+        return json.dumps(
+            {"success": False, "error": "Python tools not initialized"},
+            indent=2,
+        )
     result = python_tools.get_installed_packages()
     return json.dumps(result, indent=2)
 
@@ -521,5 +576,5 @@ async def get_decompiled_code() -> str:
         )
 
 
-def get_mcp_app() -> FastAPI:
+def get_mcp_app() -> FastMCP:
     return mcp

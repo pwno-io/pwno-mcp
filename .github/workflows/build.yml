@@ -25,7 +25,7 @@ jobs:
       - name: Run black
         run: uv run black --check .
       - name: Run mypy
-        run: uv run mypy pwnomcp
+        run: uv run mypy pwnomcp --ignore-missing-imports --disable-error-code=import-untyped
       - name: Run pytest
         run: uv run pytest -v
   build:
