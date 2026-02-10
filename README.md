@@ -41,11 +41,11 @@ stateful system for autonomous `pwn` and binary research, designed for LLMs agen
 
 ### Using Docker
 
-Build and run with Docker:
+#### Prebuilt image (recommended)
 
 ```bash
-# Build the image
-docker build -t pwno-mcp:latest . --platform linux/amd64
+# Pull the image
+docker pull ghcr.io/pwno-io/pwno-mcp:latest
 
 # Run with required capabilities (HTTP mode by default)
 docker run -p 5500:5500 \
@@ -54,7 +54,7 @@ docker run -p 5500:5500 \
   --security-opt seccomp=unconfined \
   --security-opt apparmor=unconfined \
   -v $(pwd)/workspace:/workspace \
-  pwno-mcp:latest
+  ghcr.io/pwno-io/pwno-mcp:latest
 
 # Open a shell instead of starting the server
 docker run --entrypoint /bin/bash -it \
@@ -63,10 +63,27 @@ docker run --entrypoint /bin/bash -it \
   --security-opt seccomp=unconfined \
   --security-opt apparmor=unconfined \
   -v $(pwd)/workspace:/workspace \
-  pwno-mcp:latest
+  ghcr.io/pwno-io/pwno-mcp:latest
 ```
 
-Or use Docker Compose:
+The image is built for `linux/amd64`; on Apple Silicon, add `--platform linux/amd64` to `docker pull` and `docker run`.
+If `:latest` is not available, use `:edge` to track the `main` branch.
+
+Tags:
+- `latest`: stable default
+- `edge`: tracks `main`
+- `sha-<short>`: pin to a commit
+- `X.Y.Z`, `X.Y`, `X`: release tags from `vX.Y.Z`
+
+#### Build locally
+
+```bash
+docker build -t pwno-mcp:latest . --platform linux/amd64
+```
+
+If you build locally, replace `ghcr.io/pwno-io/pwno-mcp:latest` with `pwno-mcp:latest` in the commands above.
+
+Or use Docker Compose (builds locally by default):
 
 ```bash
 # Build and run
@@ -111,7 +128,7 @@ docker run -p 5500:5500 \
   --cap-add=SYS_ADMIN \
   --security-opt seccomp=unconfined \
   --security-opt apparmor=unconfined \
-  pwno-mcp:latest
+  ghcr.io/pwno-io/pwno-mcp:latest
 ```
 
 The MCP server is hosted directly via `FastMCP.run()` using the Streamable HTTP
@@ -132,7 +149,7 @@ docker run -i \
   --cap-add=SYS_ADMIN \
   --security-opt seccomp=unconfined \
   --security-opt apparmor=unconfined \
-  pwno-mcp:latest --stdio
+  ghcr.io/pwno-io/pwno-mcp:latest --stdio
 ```
 
 ### Using with Claude Desktop
@@ -159,7 +176,7 @@ To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_c
         "apparmor=unconfined",
         "-v",
         "/path/to/your/workspace:/workspace",
-        "pwno-mcp:latest",
+        "ghcr.io/pwno-io/pwno-mcp:latest",
         "--stdio"
       ]
     }
