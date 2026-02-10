@@ -1,4 +1,6 @@
-FROM --platform=linux/amd64 ubuntu:24.04 AS base
+ARG TARGETPLATFORM
+FROM --platform=$TARGETPLATFORM ghcr.io/astral-sh/uv:latest AS uv
+FROM --platform=$TARGETPLATFORM ubuntu:24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -16,7 +18,7 @@ RUN dpkg --add-architecture i386 && \
       libssl3:i386 libncurses6:i386 libreadline8:i386 libtinfo6:i386 \
       libglib2.0-dev libfdt-dev libpixman-1-dev zlib1g-dev 
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=uv /uv /uvx /bin/
 
 RUN curl -qsL 'https://install.pwndbg.re' | sh -s -- -t pwndbg-gdb
 
@@ -50,6 +52,7 @@ USER pwno
 
 ENV PYTHONPATH=/app
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 RUN uv sync
 
@@ -67,6 +70,4 @@ ENV PROD=true
 
 EXPOSE 5500
 # For Firecracker VM: systemd boots as PID 1 and starts pwnomcp.service
-ENTRYPOINT ["/bin/bash"]
-# For stdio mode (Claude Desktop, etc.): ["uv", "run", "-m", "pwnomcp"]
-# For HTTP mode: ["uv", "run", "-m", "pwnomcp", "--http"]
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "pwnomcp"]

@@ -7,7 +7,7 @@ name = "pwno-mcp"
 version = "0.1.0"
 description = "MCP server for autonomous low-level security research with pwndbg"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.12,<3.14"
 license = {file = "LICENSE"}
 authors = [
     {name = "Pwno Team"},
