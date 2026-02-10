@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 # Reuse the already-initialized runtime context from the MCP router
 from pwnomcp.router import mcp as mcp_router
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,14 +19,17 @@ class AttachRequest(BaseModel):
     - after: list of GDB commands to execute after successful attach
     - where: optional binary path to set as debug target before pre (can be skipped if pre-setted)
     """
+
     pre: Optional[List[str]] = Field(default=None)
     pid: int
     after: Optional[List[str]] = Field(default=None)
     where: Optional[str] = Field(default=None)
     script_pid: Optional[int] = Field(default=None)
 
+
 class AttachResponse(BaseModel):
     """Response body for /attach"""
+
     successful: bool
     attach: Optional[Dict[str, Any]] = None
     result: Dict[str, Any]
@@ -35,16 +37,21 @@ class AttachResponse(BaseModel):
 
 app = FastAPI(title="pwno-mcp attach", version="0.1.0")
 
+
 def _get_tools():
     """Obtain the shared PwndbgTools instance from the MCP router."""
     tools = mcp_router.pwndbg_tools
     if tools is None:
-        raise RuntimeError("pwndbg_tools not initialized; ensure server set_runtime_context was called")
+        raise RuntimeError(
+            "pwndbg_tools not initialized; ensure server set_runtime_context was called"
+        )
     return tools
+
 
 @app.get("/")
 async def root():
     return {"message": "Pwno MCP Attach"}
+
 
 @app.post("/attach", response_model=AttachResponse)
 async def attach_endpoint(body: AttachRequest) -> AttachResponse:
@@ -112,7 +119,9 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
                 logger.exception("Error executing after command: %s", cmd)
                 command_results[cmd] = {"success": False, "error": str(e)}
 
-    return AttachResponse(successful=attach_success, attach=attach_info, result=command_results)
+    return AttachResponse(
+        successful=attach_success, attach=attach_info, result=command_results
+    )
 
 
 def get_attach_app() -> FastAPI:

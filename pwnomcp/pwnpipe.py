@@ -16,7 +16,9 @@ class PwnPipe:
     - Detects attach marker lines: 'PWNCLI_ATTACH_RESULT:<json>'
     """
 
-    def __init__(self, command: str, cwd: Optional[str] = None, env: Optional[dict] = None):
+    def __init__(
+        self, command: str, cwd: Optional[str] = None, env: Optional[dict] = None
+    ):
         self.command = command
         self.cwd = cwd
         self.env = env or {}
@@ -51,7 +53,7 @@ class PwnPipe:
         self._t_wait.start()
 
     def _reader(self, pipe):
-        for line in iter(pipe.readline, ''):
+        for line in iter(pipe.readline, ""):
             if line.startswith("PWNCLI_ATTACH_RESULT:"):
                 payload = line.split(":", 1)[1].strip()
                 try:
@@ -90,7 +92,7 @@ class PwnPipe:
                 chunks.append(self._q.get_nowait())
         except queue.Empty:
             pass
-        return ''.join(chunks)
+        return "".join(chunks)
 
     def get_attach_result(self):
         with self._lock:
@@ -103,5 +105,3 @@ class PwnPipe:
         finally:
             with self._lock:
                 self._alive = False
-
-

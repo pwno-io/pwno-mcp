@@ -67,5 +67,3 @@ def attach(
 
     data = response.json()
     return AttachResponse.model_validate(data)
-
-

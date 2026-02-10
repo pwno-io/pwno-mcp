@@ -7,15 +7,20 @@ prod_env = os.getenv("PROD", False)
 
 if prod_env:
     handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    )
     handler.setFormatter(formatter)
 else:
     try:
         from rich.logging import RichHandler
+
         handler = RichHandler(rich_tracebacks=True)
     except Exception:
         handler = logging.StreamHandler()
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+        formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+        )
         handler.setFormatter(formatter)
 
 logger.addHandler(handler)

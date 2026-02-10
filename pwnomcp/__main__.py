@@ -9,10 +9,28 @@ from pwnomcp.server import run_server, run_stdio
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Pwno MCP Server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host address for the main MCP server (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=5500, help="Port for the main MCP server (default: 5500)")
-    parser.add_argument("--attach-host", default="127.0.0.1", help="Host address for the attach API server (default: 127.0.0.1)")
-    parser.add_argument("--attach-port", type=int, default=5501, help="Port for the attach API server (default: 5501)")
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host address for the main MCP server (default: 0.0.0.0)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5500,
+        help="Port for the main MCP server (default: 5500)",
+    )
+    parser.add_argument(
+        "--attach-host",
+        default="127.0.0.1",
+        help="Host address for the attach API server (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--attach-port",
+        type=int,
+        default=5501,
+        help="Port for the attach API server (default: 5501)",
+    )
     parser.add_argument(
         "--streamable-http-path",
         default="/debug",

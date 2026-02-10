@@ -16,10 +16,8 @@ from pwnomcp.utils.auth.handler import NonceAuthProvider, create_auth_settings
 from pwnomcp.retdec.retdec import RetDecAnalyzer
 from pwnomcp.pwnpipe import PwnPipe
 
-
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -48,7 +46,7 @@ def set_runtime_context(
     subprocess_: SubprocessTools,
     git_: GitTools,
     python_: PythonTools,
-    retdec: RetDecAnalyzer
+    retdec: RetDecAnalyzer,
 ) -> None:
     global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
     gdb_controller = gdb
@@ -80,9 +78,15 @@ def catch_errors(tuple_on_error: bool = False):
             except Exception as e:
                 logger.exception("tool error in %s", fn.__name__)
                 if tuple_on_error:
-                    return {"success": False, "error": str(e), "type": type(e).__name__}, []
+                    return {
+                        "success": False,
+                        "error": str(e),
+                        "type": type(e).__name__,
+                    }, []
                 return {"success": False, "error": str(e), "type": type(e).__name__}
+
         return wrapper
+
     return decorator
 
 
@@ -146,7 +150,7 @@ async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
     current_pwnpipe = pipe
 
     # Read whatever is available immediately
-    time.sleep(3) # FIXME:
+    time.sleep(3)  # FIXME:
     output = pipe.release()
     attach_result = pipe.get_attach_result()
 
@@ -302,7 +306,9 @@ async def get_context(context_type: str = "all") -> Dict[str, Any]:
 
 @mcp.tool()
 @catch_errors()
-async def set_breakpoint(location: str, condition: Optional[str] = None) -> Dict[str, Any]:
+async def set_breakpoint(
+    location: str, condition: Optional[str] = None
+) -> Dict[str, Any]:
     """Set a breakpoint using MI (-break-insert).
 
     Args:
@@ -315,9 +321,7 @@ async def set_breakpoint(location: str, condition: Optional[str] = None) -> Dict
 @mcp.tool()
 @catch_errors()
 async def get_memory(
-    address: str,
-    size: int = 64,
-    format: str = "hex"
+    address: str, size: int = 64, format: str = "hex"
 ) -> Dict[str, Any]:
     """Read memory at the specified address.
 
@@ -337,7 +341,9 @@ async def get_session_info() -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def run_command(command: str, cwd: Optional[str] = None, timeout: float = 30.0) -> str:
+async def run_command(
+    command: str, cwd: Optional[str] = None, timeout: float = 30.0
+) -> str:
     """Execute a system command and wait for completion.
 
     Note:
@@ -397,7 +403,7 @@ async def fetch_repo(
     repo_url: str,
     version: Optional[str] = None,
     target_dir: Optional[str] = None,
-    shallow: bool = True
+    shallow: bool = True,
 ) -> str:
     """Fetch a git repository into /workspace.
 
@@ -410,7 +416,7 @@ async def fetch_repo(
     if target_dir and not os.path.isabs(target_dir):
         target_dir = os.path.join(DEFAULT_WORKSPACE, target_dir)
     elif not target_dir:
-        repo_name = repo_url.rstrip('/').split('/')[-1].replace('.git', '')
+        repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
         target_dir = os.path.join(DEFAULT_WORKSPACE, repo_name)
     result = git_tools.fetch_repo(repo_url, version, target_dir, shallow)
     return json.dumps(result, indent=2)
@@ -421,7 +427,7 @@ async def execute_python_script(
     script_path: str,
     args: Optional[str] = None,
     cwd: Optional[str] = None,
-    timeout: float = 300.0
+    timeout: float = 300.0,
 ) -> str:
     """Execute an existing Python script within the shared environment.
 
@@ -440,9 +446,7 @@ async def execute_python_script(
 
 @mcp.tool()
 async def execute_python_code(
-    code: str,
-    cwd: Optional[str] = None,
-    timeout: float = 300.0
+    code: str, cwd: Optional[str] = None, timeout: float = 300.0
 ) -> str:
     """Execute Python code dynamically in the shared environment.
 
@@ -458,10 +462,7 @@ async def execute_python_code(
 
 
 @mcp.tool()
-async def install_python_packages(
-    packages: str,
-    upgrade: bool = False
-) -> str:
+async def install_python_packages(packages: str, upgrade: bool = False) -> str:
     """Install additional Python packages using the shared package manager (uv).
 
     Args:
@@ -484,10 +485,10 @@ async def list_python_packages() -> str:
 async def get_retdec_status() -> str:
     """Get the current RetDec decompilation status, lazily initializing as needed."""
     if not retdec_analyzer:
-        return json.dumps({
-            "status": "not_initialized",
-            "message": "RetDec analyzer not initialized"
-        }, indent=2)
+        return json.dumps(
+            {"status": "not_initialized", "message": "RetDec analyzer not initialized"},
+            indent=2,
+        )
     if not retdec_analyzer._initialized:
         logger.info("Performing lazy initialization of RetDec analyzer")
         await retdec_analyzer.initialize()
@@ -499,26 +500,25 @@ async def get_retdec_status() -> str:
 async def get_decompiled_code() -> str:
     """Return RetDec decompiled C code if available, or a status describing why not."""
     if not retdec_analyzer:
-        return json.dumps({
-            "status": "error",
-            "message": "RetDec analyzer not initialized"
-        }, indent=2)
+        return json.dumps(
+            {"status": "error", "message": "RetDec analyzer not initialized"}, indent=2
+        )
     if not retdec_analyzer._initialized:
         logger.info("Performing lazy initialization of RetDec analyzer")
         await retdec_analyzer.initialize()
     code = retdec_analyzer.get_decompiled_code()
     if code:
-        return json.dumps({
-            "status": "success",
-            "decompiled_code": code
-        }, indent=2)
+        return json.dumps({"status": "success", "decompiled_code": code}, indent=2)
     else:
         status = retdec_analyzer.get_status()
-        return json.dumps({
-            "status": "unavailable",
-            "reason": status.get("status"),
-            "details": status
-        }, indent=2)
+        return json.dumps(
+            {
+                "status": "unavailable",
+                "reason": status.get("status"),
+                "details": status,
+            },
+            indent=2,
+        )
 
 
 def get_mcp_app() -> FastAPI:

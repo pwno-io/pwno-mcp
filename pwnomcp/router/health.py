@@ -8,8 +8,8 @@ from pwnomcp.router.mcp import (
     subprocess_tools,
 )
 
-
 router = APIRouter()
+
 
 @router.get("/")
 async def root():
@@ -24,12 +24,10 @@ async def health_check():
         "version": "1.0.0",
         "workspace": {
             "path": DEFAULT_WORKSPACE,
-            "exists": os.path.exists(DEFAULT_WORKSPACE)
+            "exists": os.path.exists(DEFAULT_WORKSPACE),
         },
-        "authentication": {
-            "enabled": auth_provider.is_auth_enabled
-        },
-        "components": {}
+        "authentication": {"enabled": auth_provider.is_auth_enabled},
+        "components": {},
     }
 
     if gdb_controller:
@@ -48,5 +46,3 @@ async def health_check():
             health_status["active_processes"] = 0
 
     return health_status
-
-

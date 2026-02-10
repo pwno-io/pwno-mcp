@@ -13,7 +13,6 @@ from pwnomcp.router import mcp as mcp_router
 from pwnomcp.state import SessionState
 from pwnomcp.tools import GitTools, PwndbgTools, PythonTools, SubprocessTools
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -53,7 +52,9 @@ def _initialize_components() -> None:
             os.makedirs(DEFAULT_WORKSPACE, exist_ok=True)
             logger.info("Created default workspace directory: %s", DEFAULT_WORKSPACE)
         except OSError as exc:
-            logger.warning("Could not create workspace directory %s: %s", DEFAULT_WORKSPACE, exc)
+            logger.warning(
+                "Could not create workspace directory %s: %s", DEFAULT_WORKSPACE, exc
+            )
             logger.info("Continuing without default workspace directory")
 
     gdb_controller = GdbController()
@@ -104,7 +105,9 @@ def _configure_fastmcp(host: str, port: int, streamable_http_path: str) -> None:
         mcp_router.mcp.settings.streamable_http_path = streamable_http_path
 
 
-def _start_attach_server(host: Optional[str], port: Optional[int]) -> Optional[AttachServerHandle]:
+def _start_attach_server(
+    host: Optional[str], port: Optional[int]
+) -> Optional[AttachServerHandle]:
     """Start the attach FastAPI server in a background daemon thread."""
     if not host or not port:
         logger.info("Attach server disabled (host or port missing)")
@@ -121,7 +124,9 @@ def _start_attach_server(host: Optional[str], port: Optional[int]) -> Optional[A
         except Exception:
             logger.exception("Attach server crashed")
 
-    thread = threading.Thread(target=_serve_attach, name="pwno-mcp-attach-server", daemon=True)
+    thread = threading.Thread(
+        target=_serve_attach, name="pwno-mcp-attach-server", daemon=True
+    )
     thread.start()
 
     return AttachServerHandle(server=attach_server, thread=thread)
@@ -184,7 +189,9 @@ def run_server(
     attach_handle = _start_attach_server(attach_host, attach_port)
 
     try:
-        logger.info("Launching FastMCP server via mcp.run(transport='streamable-http')...")
+        logger.info(
+            "Launching FastMCP server via mcp.run(transport='streamable-http')..."
+        )
         mcp_router.mcp.run(transport="streamable-http")
     except KeyboardInterrupt:
         logger.info("Received interrupt, shutting down Pwno MCP server")
