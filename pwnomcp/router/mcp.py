@@ -49,14 +49,7 @@ def set_runtime_context(
     python_: PythonTools,
     retdec: RetDecAnalyzer,
 ) -> None:
-    global \
-        gdb_controller, \
-        session_state, \
-        pwndbg_tools, \
-        subprocess_tools, \
-        git_tools, \
-        python_tools, \
-        retdec_analyzer
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
     gdb_controller = gdb
     session_state = session
     pwndbg_tools = pwndbg
