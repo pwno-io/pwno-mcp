@@ -4,7 +4,7 @@ import os
 import shlex
 from typing import Optional, Dict, Any, Tuple, List
 from functools import wraps
-import time
+import threading
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
@@ -33,6 +33,7 @@ git_tools: Optional[GitTools] = None
 python_tools: Optional[PythonTools] = None
 retdec_analyzer: Optional[RetDecAnalyzer] = None
 current_pwnpipe: Optional[PwnPipe] = None
+_pwnpipe_lock = threading.Lock()
 
 # Authentication (not currently enabled for FastMCP)
 auth_provider = NonceAuthProvider()
@@ -48,7 +49,14 @@ def set_runtime_context(
     python_: PythonTools,
     retdec: RetDecAnalyzer,
 ) -> None:
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
+    global \
+        gdb_controller, \
+        session_state, \
+        pwndbg_tools, \
+        subprocess_tools, \
+        git_tools, \
+        python_tools, \
+        retdec_analyzer
     gdb_controller = gdb
     session_state = session
     pwndbg_tools = pwndbg
@@ -112,7 +120,9 @@ async def execute(command: str) -> Dict[str, Any]:
 
 @mcp.tool()
 @catch_errors()
-async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
+async def pwncli(
+    file: str, argument: str = "", wait_timeout: float = 3.0
+) -> Dict[str, Any]:
     """Run a pwncli exploit script via uv and manage its I/O through a global PwnPipe.
 
     Behavior:
@@ -121,10 +131,12 @@ async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
     - Maintains a single global PwnPipe to stream stdout/stderr and accept stdin
     - Detects a single-line marker printed by pwncli after attach:
       "PWNCLI_ATTACH_RESULT:{...json...}" and exposes it as attachment.result
+    - Waits up to wait_timeout seconds for attach/output/exit before returning
 
     Args:
         file: The full contents of a pwncli-style Python script that calls cli_script(). (e.g., interacting I/O with `sa()`, with binary using `ia()`)
         argument: Additional pwncli arguments after "debug /workspace/target" (e.g., "-vv -b malloc").
+        wait_timeout: Max time (seconds) to wait for initial attach/output/exit signal.
 
     Returns:
         {
@@ -145,18 +157,24 @@ async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(file)
 
-    # Kill previous pipe if alive
-    if current_pwnpipe and current_pwnpipe.is_alive():
-        current_pwnpipe.kill()
-    current_pwnpipe = None
+    replaced = False
+    with _pwnpipe_lock:
+        # Kill previous pipe if alive
+        if current_pwnpipe and current_pwnpipe.is_alive():
+            current_pwnpipe.kill()
+            replaced = True
+        current_pwnpipe = None
 
-    # Build command and start
-    cmd = f"uv run {script_path} debug {os.path.join(DEFAULT_WORKSPACE, 'target')} {argument}".strip()
-    pipe = PwnPipe(command=cmd, cwd=DEFAULT_WORKSPACE, env={"PYTHONUNBUFFERED": "1"})
-    current_pwnpipe = pipe
+        # Build command and start
+        cmd = (
+            f"uv run {script_path} debug {os.path.join(DEFAULT_WORKSPACE, 'target')} {argument}"
+        ).strip()
+        pipe = PwnPipe(
+            command=cmd, cwd=DEFAULT_WORKSPACE, env={"PYTHONUNBUFFERED": "1"}
+        )
+        current_pwnpipe = pipe
 
-    # Read whatever is available immediately
-    time.sleep(3)  # FIXME:
+    startup = pipe.wait_ready(timeout=wait_timeout)
     output = pipe.release()
     attach_result = pipe.get_attach_result()
 
@@ -168,6 +186,14 @@ async def pwncli(file: str, argument: str = "") -> Dict[str, Any]:
         },
         "attachment": {
             "result": attach_result,
+        },
+        "startup": {
+            "ready": startup.get("ready"),
+            "reason": startup.get("reason"),
+            "wait_ms": startup.get("wait_ms"),
+            "alive": pipe.is_alive(),
+            "pid": pipe.get_pid(),
+            "replaced": replaced,
         },
     }
 
@@ -186,9 +212,10 @@ async def sendinput(data: str) -> Dict[str, Any]:
     Returns:
         { "success": bool } indicating whether the input was written successfully.
     """
-    if not current_pwnpipe or not current_pwnpipe.is_alive():
-        return {"success": False, "error": "No active PwnPipe"}
-    ok = current_pwnpipe.send(data)
+    with _pwnpipe_lock:
+        if not current_pwnpipe or not current_pwnpipe.is_alive():
+            return {"success": False, "error": "No active PwnPipe"}
+        ok = current_pwnpipe.send(data)
     return {"success": bool(ok)}
 
 
@@ -201,10 +228,43 @@ async def checkoutput() -> Dict[str, Any]:
         { "success": True, "output": str } on success, or a failure object when no pipe exists.
         The internal buffer is cleared by this call (subsequent calls only return new output).
     """
-    if not current_pwnpipe:
-        return {"success": False, "error": "No active PwnPipe"}
-    out = current_pwnpipe.release()
+    with _pwnpipe_lock:
+        if not current_pwnpipe:
+            return {"success": False, "error": "No active PwnPipe"}
+        out = current_pwnpipe.release()
     return {"success": True, "output": out}
+
+
+@mcp.tool()
+@catch_errors()
+async def checkevents() -> Dict[str, Any]:
+    """Release and return structured events from the active PwnPipe.
+
+    Returns:
+        {"success": True, "events": [...], "alive": bool, "exit_code": int|None}
+    """
+    with _pwnpipe_lock:
+        if not current_pwnpipe:
+            return {"success": False, "error": "No active PwnPipe"}
+        events = current_pwnpipe.release_events()
+        alive = current_pwnpipe.is_alive()
+        exit_code = current_pwnpipe.get_exit_code()
+    return {"success": True, "events": events, "alive": alive, "exit_code": exit_code}
+
+
+@mcp.tool()
+@catch_errors()
+async def pwncli_stop() -> Dict[str, Any]:
+    """Stop the active pwncli driver session and clear the pipe."""
+    global current_pwnpipe
+    with _pwnpipe_lock:
+        if not current_pwnpipe:
+            return {"success": False, "error": "No active PwnPipe"}
+        was_alive = current_pwnpipe.is_alive()
+        exit_code = current_pwnpipe.get_exit_code()
+        current_pwnpipe.kill()
+        current_pwnpipe = None
+    return {"success": True, "was_alive": was_alive, "exit_code": exit_code}
 
 
 @mcp.tool()
@@ -264,6 +324,28 @@ async def step_control(command: str) -> Dict[str, Any]:
         Dict with MI responses and state.
     """
     return _require_pwndbg_tools().step_control(command)
+
+
+@mcp.tool()
+@catch_errors()
+async def gdb_poll(timeout: float = 0.0) -> Dict[str, Any]:
+    """Drain pending async GDB notifications.
+
+    Args:
+        timeout: Maximum time to wait (seconds) for the first event.
+    """
+    return _require_pwndbg_tools().gdb_poll(timeout)
+
+
+@mcp.tool()
+@catch_errors()
+async def gdb_interrupt(timeout: float = 1.0) -> Dict[str, Any]:
+    """Interrupt the inferior and drain async notifications.
+
+    Args:
+        timeout: Maximum time to wait (seconds) for stop notifications.
+    """
+    return _require_pwndbg_tools().gdb_interrupt(timeout)
 
 
 @mcp.tool()
