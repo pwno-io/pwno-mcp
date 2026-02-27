@@ -7,6 +7,7 @@ immediate responses suitable for LLM interaction.
 """
 
 import logging
+import time
 from typing import List, Dict, Optional, Any, Tuple
 from pathlib import Path
 from pygdbmi import gdbcontroller
@@ -134,6 +135,88 @@ class GdbController:
             payload = response.get("payload", {})
             self._inferior_pid = payload.get("pid")
             logger.debug(f"Thread group started, PID: {self._inferior_pid}")
+
+    def _get_async_responses(self, timeout_sec: float) -> List[Dict[str, Any]]:
+        getter = getattr(self.controller, "get_gdb_response", None)
+        if not callable(getter):
+            return []
+        try:
+            responses = getter(timeout_sec=timeout_sec, raise_error_on_timeout=False)
+        except TypeError:
+            try:
+                responses = getter(timeout_sec=timeout_sec)
+            except Exception:
+                return []
+        except Exception:
+            return []
+        return responses if isinstance(responses, list) else []
+
+    def drain_async(
+        self, timeout_sec: float = 0.0, max_rounds: int = 10
+    ) -> Dict[str, Any]:
+        """Drain pending async MI notifications from GDB.
+
+        Args:
+            timeout_sec: Max time to wait for the first batch.
+            max_rounds: Max additional drain loops to clear buffered output.
+        """
+        responses: List[Dict[str, Any]] = []
+        error_found = False
+
+        start = time.monotonic()
+        first = True
+        for _ in range(max_rounds):
+            if first:
+                remaining = max(0.0, timeout_sec - (time.monotonic() - start))
+                batch = self._get_async_responses(timeout_sec=remaining)
+                first = False
+            else:
+                batch = self._get_async_responses(timeout_sec=0.0)
+
+            if not batch:
+                break
+
+            for response in batch:
+                if response.get("type") == "notify":
+                    self._handle_notify(response)
+                elif (
+                    response.get("type") == "result"
+                    and response.get("message") == "error"
+                ):
+                    error_found = True
+            responses.extend(batch)
+
+        return {
+            "responses": responses,
+            "success": not error_found,
+            "state": self._state,
+        }
+
+    def interrupt(self, timeout_sec: float = 1.0) -> Dict[str, Any]:
+        """Interrupt the inferior and drain async notifications."""
+        responses: List[Dict[str, Any]] = []
+        error_found = False
+        try:
+            interrupt_fn = getattr(self.controller, "interrupt_gdb", None)
+            if callable(interrupt_fn):
+                interrupt_fn()
+            else:
+                result = self.execute_mi_command("-exec-interrupt")
+                responses.extend(result.get("responses", []))
+                if not result.get("success", True):
+                    error_found = True
+        except Exception as exc:
+            return {
+                "responses": responses,
+                "success": False,
+                "state": self._state,
+                "error": str(exc),
+            }
+
+        drained = self.drain_async(timeout_sec=timeout_sec)
+        responses.extend(drained.get("responses", []))
+        success = (not error_found) and drained.get("success", True)
+        return {"responses": responses, "success": success, "state": self._state}
 
     def get_context(self, context_type: str) -> Dict[str, Any]:
         """Get a specific pwndbg context; return raw responses"""

@@ -169,6 +169,24 @@ class PwndbgTools:
         self.session.record_command(result.get("command", actual), result)
         return result
 
+    def gdb_poll(self, timeout: float = 0.0) -> Dict[str, Any]:
+        """Drain pending async GDB notifications."""
+        logger.info("GDB poll")
+        self.gdb.initialize()
+        result = self.gdb.drain_async(timeout_sec=timeout)
+        self.session.update_state(result["state"])
+        self.session.record_command("gdb_poll", result)
+        return result
+
+    def gdb_interrupt(self, timeout: float = 1.0) -> Dict[str, Any]:
+        """Interrupt the inferior and drain async notifications."""
+        logger.info("GDB interrupt")
+        self.gdb.initialize()
+        result = self.gdb.interrupt(timeout_sec=timeout)
+        self.session.update_state(result["state"])
+        self.session.record_command("gdb_interrupt", result)
+        return result
+
     def get_context(self, context_type: str = "all") -> Dict[str, Any]:
         """Get debugging context (registers, stack, disassembly, etc.)"""
         logger.info(f"Get context: {context_type}")
