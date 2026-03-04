@@ -141,60 +141,45 @@ Use an absolute host path for the workspace mount (your project's `workspace` di
 </details>
 
 <details>
-<summary><strong>Claude Code (plugin MCP config, stdio)</strong></summary>
+<summary><strong>Claude Code (HTTP or stdio)</strong></summary>
 
-Claude Code loads MCP servers via plugin configuration.
+Claude Code supports both remote HTTP MCP servers and local stdio MCP servers.
 
-1. Create a plugin folder (example):
+### Option 1 (recommended): HTTP
 
-```bash
-mkdir -p "$HOME/pwno-claude-plugin/.claude-plugin"
-```
-
-2. Create `~/pwno-claude-plugin/.claude-plugin/plugin.json`:
-
-```json
-{
-  "name": "pwno-mcp-plugin",
-  "version": "0.1.0",
-  "description": "pwno-mcp integration"
-}
-```
-
-3. Create `~/pwno-claude-plugin/.mcp.json` (use an absolute host path to your project's `workspace` directory):
-
-```json
-{
-  "mcpServers": {
-    "pwno-mcp": {
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "-i",
-        "--cap-add=SYS_PTRACE",
-        "--cap-add=SYS_ADMIN",
-        "--security-opt",
-        "seccomp=unconfined",
-        "--security-opt",
-        "apparmor=unconfined",
-        "-v",
-        "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace",
-        "ghcr.io/pwno-io/pwno-mcp:latest",
-        "--stdio"
-      ]
-    }
-  }
-}
-```
-
-4. Launch Claude Code with that plugin directory:
+1. Start `pwno-mcp` in HTTP mode (see Quick Start).
+2. From your project root, add the server:
 
 ```bash
-cc --plugin-dir "$HOME/pwno-claude-plugin"
+claude mcp add --transport http --scope project pwno-mcp http://127.0.0.1:5500/debug
 ```
 
-5. In Claude Code, run `/mcp` to verify `pwno-mcp` and its tools are loaded.
+3. In Claude Code, run `/mcp` to verify `pwno-mcp` is connected.
+
+### Option 2: stdio (Claude Code spawns Docker)
+
+This stores a project-scoped `.mcp.json` and runs the server as a local process.
+
+Replace `/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace` with the absolute path to your project's `workspace` directory:
+
+```bash
+claude mcp add --transport stdio --scope project pwno-mcp -- \
+  docker run --rm -i \
+    --cap-add=SYS_PTRACE \
+    --cap-add=SYS_ADMIN \
+    --security-opt seccomp=unconfined \
+    --security-opt apparmor=unconfined \
+    -v "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace" \
+    ghcr.io/pwno-io/pwno-mcp:latest \
+    --stdio
+```
+
+Manage servers:
+
+```bash
+claude mcp list
+claude mcp get pwno-mcp
+```
 
 </details>
 
