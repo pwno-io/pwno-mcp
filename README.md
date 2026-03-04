@@ -112,57 +112,122 @@ The Docker image includes:
 
 ## Usage
 
-### Running the Server
+### Quick Start (Docker, recommended)
 
-The server supports two modes:
+Create a `./workspace` folder in your current project directory, put your target
+binary there, start the server, then connect your MCP client.
 
-#### HTTP Mode (Default - Streamable HTTP)
-
-Running the module without extra flags starts the Streamable HTTP transport:
+1. From your current project directory, create `./workspace` and place your target binary there (name it `target`):
 
 ```bash
-python -m pwnomcp
-# or with Docker:
-docker run -p 5500:5500 \
+mkdir -p ./workspace
+cp ./path/to/your/binary ./workspace/target
+chmod +x ./workspace/target
+```
+
+2. Pick transport:
+
+- Use **Streamable HTTP** when your client asks for a `url`.
+- Use **stdio** when your client asks for `command` + `args`.
+
+3. Start server.
+
+#### Streamable HTTP mode (default transport)
+
+```bash
+docker run --rm -p 5500:5500 \
   --cap-add=SYS_PTRACE \
   --cap-add=SYS_ADMIN \
   --security-opt seccomp=unconfined \
   --security-opt apparmor=unconfined \
+  -v "$PWD/workspace:/workspace" \
   ghcr.io/pwno-io/pwno-mcp:latest
 ```
 
-The MCP server is hosted directly via `FastMCP.run()` using the Streamable HTTP
-transport. The default endpoint is `http://0.0.0.0:5500/debug`, so tools such as
-Claude Desktop should point at that base URL (e.g. `/debug/messages/`). The
-attach helper API continues to be served on `http://127.0.0.1:5501/attach`.
+Run this from the host shell in the directory that contains `./workspace`.
 
-#### stdio Mode (for MCP Clients)
+This mount makes your local `./workspace` available inside the container at `/workspace`.
 
-To use stdio transport (e.g., for Claude Desktop's local integration), pass the
-`--stdio` flag explicitly:
+MCP URL for clients in this mode:
+
+- `http://127.0.0.1:5500/debug`
+
+#### stdio mode (for local MCP clients)
+
+Run this from the host shell in the directory that contains `./workspace`.
 
 ```bash
-python -m pwnomcp --stdio
-# or with Docker:
-docker run -i \
+docker run --rm -i \
   --cap-add=SYS_PTRACE \
   --cap-add=SYS_ADMIN \
   --security-opt seccomp=unconfined \
   --security-opt apparmor=unconfined \
-  ghcr.io/pwno-io/pwno-mcp:latest --stdio
+  -v "$PWD/workspace:/workspace" \
+  ghcr.io/pwno-io/pwno-mcp:latest \
+  --stdio
 ```
 
-### Using with Claude Desktop
+Notes:
 
-To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_config.json`:
+- `streamable_http_path` defaults to `/debug`.
+- Attach helper API defaults to `127.0.0.1:5501` inside the server runtime.
 
-**On macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**On Linux**: `~/.config/Claude/claude_desktop_config.json`
+### First Debug Session (what to do)
+
+After your MCP client is connected to `pwno-mcp`, run tools in this order.
+If you followed Quick Start, your binary is named `target`: `./workspace/target` on the host and
+`/workspace/target` inside tool calls.
+
+1. Load binary:
+
+```json
+{"tool":"set_file","arguments":{"binary_path":"/workspace/target"}}
+```
+
+2. Set breakpoint (recommended so execution stops predictably):
+
+```json
+{"tool":"set_breakpoint","arguments":{"location":"main"}}
+```
+
+3. Run target:
+
+```json
+{"tool":"run","arguments":{"args":""}}
+```
+
+4. Inspect context:
+
+```json
+{"tool":"get_context","arguments":{"context_type":"all"}}
+```
+
+5. Step as needed:
+
+```json
+{"tool":"step_control","arguments":{"command":"n"}}
+```
+
+Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
+
+### MCP Client Setup
+
+All snippets below use the server name `pwno-mcp`.
+
+<details>
+<summary><strong>Claude Desktop (stdio)</strong></summary>
+
+Config file:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+Use an absolute host path for the workspace mount (your project's `workspace` directory):
 
 ```json
 {
   "mcpServers": {
-    "pwndbg-mcp": {
+    "pwno-mcp": {
       "command": "docker",
       "args": [
         "run",
@@ -175,7 +240,7 @@ To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_c
         "--security-opt",
         "apparmor=unconfined",
         "-v",
-        "/path/to/your/workspace:/workspace",
+        "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace",
         "ghcr.io/pwno-io/pwno-mcp:latest",
         "--stdio"
       ]
@@ -184,200 +249,315 @@ To use pwno-mcp with Claude Desktop, add the following to your `claude_desktop_c
 }
 ```
 
-Replace `/path/to/your/workspace` with your actual workspace directory path.
+</details>
 
-### MCP Tools
+<details>
+<summary><strong>Claude Code (plugin MCP config, stdio)</strong></summary>
 
-#### 1. Execute
-Execute any GDB/pwndbg command:
+Claude Code loads MCP servers via plugin configuration.
+
+1. Create a plugin folder (example):
+
+```bash
+mkdir -p "$HOME/pwno-claude-plugin/.claude-plugin"
+```
+
+2. Create `~/pwno-claude-plugin/.claude-plugin/plugin.json`:
+
 ```json
 {
-  "tool": "execute",
-  "arguments": {
-    "command": "info registers"
+  "name": "pwno-mcp-plugin",
+  "version": "0.1.0",
+  "description": "pwno-mcp integration"
+}
+```
+
+3. Create `~/pwno-claude-plugin/.mcp.json` (use an absolute host path to your project's `workspace` directory):
+
+```json
+{
+  "mcpServers": {
+    "pwno-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_ADMIN",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--security-opt",
+        "apparmor=unconfined",
+        "-v",
+        "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace",
+        "ghcr.io/pwno-io/pwno-mcp:latest",
+        "--stdio"
+      ]
+    }
   }
 }
 ```
 
-#### 2. Set File
-Load a binary file for debugging:
+4. Launch Claude Code with that plugin directory:
+
+```bash
+cc --plugin-dir "$HOME/pwno-claude-plugin"
+```
+
+5. In Claude Code, run `/mcp` to verify `pwno-mcp` and its tools are loaded.
+
+</details>
+
+<details>
+<summary><strong>Cursor (HTTP or stdio)</strong></summary>
+
+Cursor MCP config locations:
+
+- Project: `.cursor/mcp.json`
+- Global: `~/.cursor/mcp.json`
+
+If you use project config, keep your binary at `PROJECT_ROOT/workspace/target`.
+
+HTTP example:
+
 ```json
 {
-  "tool": "set_file",
-  "arguments": {
-    "binary_path": "/path/to/binary"
+  "mcpServers": {
+    "pwno-mcp": {
+      "url": "http://127.0.0.1:5500/debug"
+    }
   }
 }
 ```
 
-#### 3. Run
-Run the loaded binary (requires at least one enabled breakpoint set beforehand):
-```json
-{
-  "tool": "run",
-  "arguments": {
-    "args": "arg1 arg2"
-  }
-}
-```
-Note: You must set at least one enabled breakpoint before running.
+Stdio example (`.cursor/mcp.json`):
 
-#### 4. Step Control
-Control program execution:
 ```json
 {
-  "tool": "step_control",
-  "arguments": {
-    "command": "n"
-  }
-}
-```
-
-#### 5. Get Context
-Retrieve debugging context:
-```json
-{
-  "tool": "get_context",
-  "arguments": {
-    "context_type": "all"
+  "mcpServers": {
+    "pwno-mcp": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_ADMIN",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--security-opt",
+        "apparmor=unconfined",
+        "-v",
+        "${workspaceFolder}/workspace:/workspace",
+        "ghcr.io/pwno-io/pwno-mcp:latest",
+        "--stdio"
+      ]
+    }
   }
 }
 ```
 
-#### 6. Set Breakpoint
-Set breakpoints with optional conditions:
+</details>
+
+<details>
+<summary><strong>OpenCode (remote HTTP or local stdio)</strong></summary>
+
+Config file:
+
+- Global: `~/.config/opencode/opencode.json`
+- Project-specific also supported via `opencode.json` in project root
+
+Remote HTTP server example:
+
 ```json
 {
-  "tool": "set_breakpoint",
-  "arguments": {
-    "location": "main",
-    "condition": "$rax == 0"
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pwno-mcp": {
+      "type": "remote",
+      "url": "http://127.0.0.1:5500/debug",
+      "enabled": true
+    }
   }
 }
 ```
 
-#### 7. Get Memory
-Read memory at specific addresses:
+Local stdio server example:
+
+Replace `/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace` with the absolute path to your project's `workspace` directory.
+
 ```json
 {
-  "tool": "get_memory",
-  "arguments": {
-    "address": "0x400000",
-    "size": 128,
-    "format": "hex"
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "pwno-mcp": {
+      "type": "local",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_ADMIN",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--security-opt",
+        "apparmor=unconfined",
+        "-v",
+        "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace",
+        "ghcr.io/pwno-io/pwno-mcp:latest",
+        "--stdio"
+      ],
+      "enabled": true
+    }
   }
 }
 ```
 
-#### 8. Get Session Info
-Get current debugging session information:
-```json
-{
-  "tool": "get_session_info",
-  "arguments": {}
-}
+CLI helpers:
+
+- `opencode mcp add`
+- `opencode mcp list`
+
+</details>
+
+<details>
+<summary><strong>Codex CLI (HTTP or stdio)</strong></summary>
+
+Config file: `~/.codex/config.toml`
+
+HTTP example:
+
+```toml
+[mcp_servers.pwno-mcp]
+url = "http://127.0.0.1:5500/debug"
 ```
 
-#### 9. Run Command
-Execute system commands (primarily for compilation):
-```json
-{
-  "tool": "run_command",
-  "arguments": {
-    "command": "gcc -g -fsanitize=address vuln.c -o vuln",
-    "cwd": "/path/to/src",
-    "timeout": 30.0
-  }
-}
+Stdio example:
+
+Replace `/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace` with the absolute path to your project's `workspace` directory.
+
+```toml
+[mcp_servers.pwno-mcp]
+command = "docker"
+args = [
+  "run",
+  "--rm",
+  "-i",
+  "--cap-add=SYS_PTRACE",
+  "--cap-add=SYS_ADMIN",
+  "--security-opt",
+  "seccomp=unconfined",
+  "--security-opt",
+  "apparmor=unconfined",
+  "-v",
+  "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace",
+  "ghcr.io/pwno-io/pwno-mcp:latest",
+  "--stdio"
+]
 ```
 
-#### 10. Spawn Process
-Start a background process and get its PID:
-```json
-{
-  "tool": "spawn_process",
-  "arguments": {
-    "command": "python3 -m http.server 8080",
-    "cwd": "/path/to/serve"
-  }
-}
+Check configuration:
+
+```bash
+codex mcp list
 ```
 
-#### 11. Get Process Status
-Check status of a spawned process:
+</details>
+
+### Tool Reference
+
+<details>
+<summary><strong>Detailed tool reference (arguments + examples)</strong></summary>
+
+`set_file` loads an executable into GDB/pwndbg.
+
 ```json
-{
-  "tool": "get_process_status",
-  "arguments": {
-    "pid": 12345
-  }
-}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/target"}}
 ```
 
-#### 12. Kill Process
-Terminate a process:
+`set_breakpoint` sets a breakpoint by symbol/address/file:line, with optional condition.
+
 ```json
-{
-  "tool": "kill_process",
-  "arguments": {
-    "pid": 12345,
-    "signal": 15
-  }
-}
+{"tool":"set_breakpoint","arguments":{"location":"main","condition":"$rax == 0"}}
 ```
 
-#### 13. List Processes
-List all tracked background processes:
+`run` starts the loaded program.
+
 ```json
-{
-  "tool": "list_processes",
-  "arguments": {}
-}
+{"tool":"run","arguments":{"args":"arg1 arg2","start":false}}
 ```
 
-### Typical Workflow
+`step_control` controls execution using `c`, `n`, `s`, `ni`, `si`.
 
-1. Load a binary:
-   ```json
-   {"tool": "set_file", "arguments": {"binary_path": "/path/to/binary"}}
-   ```
+```json
+{"tool":"step_control","arguments":{"command":"n"}}
+```
 
-2. Prepare breakpoints, then run:
-   
-   ```json
-   {"tool": "set_breakpoint", "arguments": {"location": "main"}}
-   {"tool": "run", "arguments": {"args": ""}}
-   ```
-   
+`get_context` returns debugger context. `context_type` can be `all`, `regs`, `stack`, `disasm`, `code`, `backtrace`.
 
-3. Use stepping commands and examine state:
-   ```json
-   {"tool": "step_control", "arguments": {"command": "n"}}
-   {"tool": "get_context", "arguments": {"context_type": "all"}}
-   ```
+```json
+{"tool":"get_context","arguments":{"context_type":"all"}}
+```
 
-### Compilation Workflow Example
+`get_memory` reads memory from an address.
 
-1. Compile with AddressSanitizer:
-   ```json
-   {"tool": "run_command", "arguments": {"command": "gcc -g -fsanitize=address -fno-omit-frame-pointer vuln.c -o vuln"}}
-   ```
+```json
+{"tool":"get_memory","arguments":{"address":"$rsp","size":64,"format":"hex"}}
+```
 
-2. Load and debug the compiled binary:
-   ```json
-   {"tool": "set_file", "arguments": {"binary_path": "./vuln"}}
-   {"tool": "set_breakpoint", "arguments": {"location": "main"}}
-   {"tool": "run", "arguments": {"args": ""}}
-   ```
+`execute` runs raw GDB/pwndbg commands.
 
-3. If running a server for exploitation:
-   ```json
-   {"tool": "spawn_process", "arguments": {"command": "./vulnerable_server 8080"}}
-   ```
-   Then check its status:
-   ```json
-   {"tool": "get_process_status", "arguments": {"pid": 12345}}
-   ```
+```json
+{"tool":"execute","arguments":{"command":"info registers"}}
+```
+
+`get_session_info` returns current session + debugger state.
+
+```json
+{"tool":"get_session_info","arguments":{}}
+```
+
+`run_command` executes shell commands (compile/build helpers) in `/workspace` by default.
+
+```json
+{"tool":"run_command","arguments":{"command":"gcc -g vuln.c -o target","cwd":"/workspace","timeout":30.0}}
+```
+
+`spawn_process` starts a background process.
+
+```json
+{"tool":"spawn_process","arguments":{"command":"./target","cwd":"/workspace"}}
+```
+
+`get_process_status` checks spawned process status.
+
+```json
+{"tool":"get_process_status","arguments":{"pid":12345}}
+```
+
+`kill_process` terminates a spawned process.
+
+```json
+{"tool":"kill_process","arguments":{"pid":12345,"signal":15}}
+```
+
+`list_processes` lists tracked background processes.
+
+```json
+{"tool":"list_processes","arguments":{}}
+```
+
+</details>
+
+### Troubleshooting
+
+- `No binary loaded. Use set_file first.`: call `set_file` before `run`.
+- `binary_path` not found: path must exist inside server runtime (Docker usually means `/workspace/...`).
+- GDB attach/ptrace permission errors: keep `SYS_PTRACE`, `SYS_ADMIN`, and unconfined seccomp/apparmor flags.
+- HTTP connection failures: ensure container publishes `-p 5500:5500` and client URL is exactly `http://127.0.0.1:5500/debug` unless you changed the path.
 
 ## Development
 
