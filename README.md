@@ -4,9 +4,7 @@
   <img alt="pwno-mcp banner" src="https://github.com/user-attachments/assets/280a36f1-05f4-4b52-ba2c-cb73b10e9401">
 </picture>
 
-# `pwno-mcp`
-
-stateful system for autonomous `pwn` and binary research, designed for LLMs agents.
+<p align="center">stateful system for autonomous <code>pwn</code> and binary research, designed for LLMs agents.</p>
 
 ## Overview
 
