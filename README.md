@@ -8,7 +8,7 @@ stateful system for autonomous `pwn` and binary research, designed for LLMs agen
 and helper tooling over the Model Context Protocol (MCP) for agentic coding clients.
 
 <details>
-<summary><strong>Background / why this exists</strong></summary>
+<summary><strong>Background story</strong></summary>
 
 *We does it came from?*: This version was a result of literation of redesigning, thinking and researching for around 6 month on this problem of "making a Pwn MCP for LLMs":
 
@@ -25,18 +25,13 @@ and helper tooling over the Model Context Protocol (MCP) for agentic coding clie
 
 ## Features
 
-- GDB/pwndbg (GDB/MI), designed for LLMs
-  - `set_file`, `run`, `step_control`, `get_context`, `set_breakpoint`, `get_memory`, `attach`
-  - `execute` for raw GDB/pwndbg commands
-  - extra execution control: `gdb_interrupt`, `gdb_poll`, `finish`, `jump`, `until`, `return_from_function`
-- Local exploit workflow
-  - `pwncli` + `sendinput` / `checkoutput` / `checkevents` / `pwncli_stop`
-- Subprocess + repo helpers
-  - `run_command`, `spawn_process`, `get_process`, `kill_process`, `list_processes`
-  - `fetch_repo`, `execute_python_script`, `execute_python_code`, `install_python_packages`, `list_python_packages`
-- RetDec integration
-  - `get_retdec_status`, `get_decompiled_code` (uses `BINARY_URL` env var)
-- Optional nonce auth is implemented but currently disabled by default in `FastMCP` initialization
+- Stateful debugging for binaries via GDB + pwndbg, exposed over MCP for agentic coding clients
+- Deterministic execution control via GDB/MI (load/run/attach, breakpoints, stepping, interrupt/poll)
+- Fast context snapshots for LLMs (registers, stack, disassembly, source, backtrace) plus direct memory reads
+- Exploit workflow support with an optional `pwncli` driver for interactive I/O and event polling
+- Build + automation helpers inside the same environment (run shell commands, manage background processes, fetch repos, run Python)
+- Optional RetDec integration to fetch and cache a decompilation (`BINARY_URL` env var)
+- Designed for containerized usage; supports Streamable HTTP and stdio transports; nonce auth exists but is disabled by default
 
 
 ## Quick Start (Docker + MCP)
@@ -341,43 +336,35 @@ codex mcp list
 
 </details>
 
-## First Debug Session (what to do)
+## Verify Setup (Optional)
 
-After your MCP client is connected to `pwno-mcp`, run tools in this order.
-If you followed Quick Start, your binary is named `target`: `./workspace/target` on the host and
+Most users can skip this section. If your MCP connection is new or you are troubleshooting,
+run one quick end-to-end check with your agent.
+
+Ask your agent:
+
+```text
+Use pwno-mcp to load /workspace/target, set a breakpoint at main, run the program,
+show full context, then step once.
+```
+
+If you followed Quick Start, the binary is `./workspace/target` on host and
 `/workspace/target` inside tool calls.
 
-1. Load binary:
+<details>
+<summary><strong>Manual tool-call sequence (for troubleshooting only)</strong></summary>
 
 ```json
 {"tool":"set_file","arguments":{"binary_path":"/workspace/target"}}
-```
-
-2. Set breakpoint (recommended so execution stops predictably):
-
-```json
 {"tool":"set_breakpoint","arguments":{"location":"main"}}
-```
-
-3. Run target:
-
-```json
 {"tool":"run","arguments":{"args":""}}
-```
-
-4. Inspect context:
-
-```json
 {"tool":"get_context","arguments":{"context_type":"all"}}
-```
-
-5. Step as needed:
-
-```json
 {"tool":"step_control","arguments":{"command":"n"}}
 ```
 
 Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
+
+</details>
 
 ## Tool Reference
 
