@@ -61,9 +61,9 @@ RUN uv pip install --python /app/.venv \
       pwntools ropper git+https://github.com/pwno-io/pwnocli.git
 
 # Pre-create the shared PythonTools venv used by Pwno MCP to avoid runtime setup
-RUN mkdir -p /tmp/pwno_python_workspace && \
-    uv venv /tmp/pwno_python_workspace/shared_venv && \
-    uv pip install --python /tmp/pwno_python_workspace/shared_venv \
+RUN mkdir -p /tmp/pwno/python && \
+    uv venv /tmp/pwno/python/shared_venv && \
+    uv pip install --python /tmp/pwno/python/shared_venv \
       requests numpy ipython hexdump pwntools ropper git+https://github.com/pwno-io/pwnocli.git
 
 ENV PROD=true

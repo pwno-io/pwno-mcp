@@ -38,7 +38,7 @@ async def test_attach_endpoint_runs_pre_and_after():
             pre=["info registers"],
             pid=1337,
             after=["bt"],
-            where="/bin/ls",
+            where="target",
             script_pid=42,
         )
         response = await attach_router.attach_endpoint(body)
@@ -46,13 +46,14 @@ async def test_attach_endpoint_runs_pre_and_after():
         mcp_router.pwndbg_tools = original
 
     assert response.successful is True
+    assert response.attach is not None
     assert response.attach["pid"] == 1337
     assert response.attach["script_pid"] == 42
     assert response.result["set-file"]["success"] is True
     assert "info registers" in response.result
     assert "bt" in response.result
     assert tools.calls == [
-        ("set_file", "/bin/ls"),
+        ("set_file", "/workspace/target"),
         ("execute", "info registers"),
         ("attach", 1337),
         ("execute", "bt"),
