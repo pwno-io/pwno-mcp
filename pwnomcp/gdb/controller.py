@@ -128,6 +128,7 @@ class GdbController:
 
         elif message == "thread-group-exited":
             self._state = "exited"
+            self._inferior_pid = None
             logger.debug("Inferior state: EXITED")
 
         elif message == "thread-group-started":
@@ -384,6 +385,10 @@ class GdbController:
     def get_state(self) -> str:
         """Get current inferior state"""
         return self._state
+
+    def get_inferior_pid(self) -> Optional[int]:
+        """Get currently tracked inferior PID, if known."""
+        return self._inferior_pid
 
     def close(self):
         """Clean up GDB controller"""

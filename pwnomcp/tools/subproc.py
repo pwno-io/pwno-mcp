@@ -23,9 +23,13 @@ logger = logging.getLogger(__name__)
 class SubprocessTools:
     """Tools for subprocess execution and management"""
 
-    def __init__(self):
-        """Initialize subprocess tools"""
+    def __init__(self, process_root: Optional[str] = None):
+        """Initialize subprocess tools."""
         self.background_processes: Dict[int, Dict[str, Any]] = {}
+        self.process_root = process_root or os.path.join(
+            tempfile.gettempdir(), "pwno", "processes"
+        )
+        os.makedirs(self.process_root, exist_ok=True)
 
     def run_command(
         self,
@@ -120,11 +124,11 @@ class SubprocessTools:
             Dictionary with process information including PID
         """
         logger.info(f"Spawning process: {command}")
-        # Create temp files for stdout and stderr
-        stdout_fd, stdout_path = tempfile.mkstemp(prefix="pwno_stdout_", suffix=".log")
-        stderr_fd, stderr_path = tempfile.mkstemp(prefix="pwno_stderr_", suffix=".log")
-        stdout_file = os.fdopen(stdout_fd, "w+")
-        stderr_file = os.fdopen(stderr_fd, "w+")
+        process_dir = tempfile.mkdtemp(prefix="proc_", dir=self.process_root)
+        stdout_path = os.path.join(process_dir, "stdout.log")
+        stderr_path = os.path.join(process_dir, "stderr.log")
+        stdout_file = open(stdout_path, "w+", encoding="utf-8")
+        stderr_file = open(stderr_path, "w+", encoding="utf-8")
 
         try:
             # Parse command
@@ -152,6 +156,7 @@ class SubprocessTools:
                 "stderr_file": stderr_file,
                 "stdout_path": stdout_path,
                 "stderr_path": stderr_path,
+                "process_dir": process_dir,
                 "command": command,
                 "cwd": cwd or os.getcwd(),
             }
@@ -188,10 +193,19 @@ class SubprocessTools:
                 "status": "running",
                 "stdout_path": stdout_path,
                 "stderr_path": stderr_path,
+                "process_dir": process_dir,
             }
 
         except Exception as e:
             logger.error(f"Failed to spawn process: {e}")
+            try:
+                stdout_file.close()
+            except Exception:
+                pass
+            try:
+                stderr_file.close()
+            except Exception:
+                pass
             return {"success": False, "command": command, "error": str(e)}
 
     def get_process(self, pid: int) -> Dict[str, Any]:
@@ -245,6 +259,7 @@ class SubprocessTools:
                         "success": True,
                         "pid": pid,
                         "status": "running",
+                        "process_dir": entry.get("process_dir"),
                         "stdout_path": entry["stdout_path"],
                         "stderr_path": entry["stderr_path"],
                         "stdout": live_stdout,
@@ -266,6 +281,7 @@ class SubprocessTools:
                         "pid": pid,
                         "status": "terminated",
                         "returncode": poll_result,
+                        "process_dir": entry.get("process_dir"),
                         "stdout": stdout,
                         "stderr": stderr,
                         "stdout_path": entry["stdout_path"],
@@ -338,6 +354,7 @@ class SubprocessTools:
                         {
                             "pid": pid,
                             "status": "running",
+                            "process_dir": entry.get("process_dir"),
                             "name": proc_info.name(),
                             "cmdline": " ".join(proc_info.cmdline()),
                             "cpu_percent": proc_info.cpu_percent(),

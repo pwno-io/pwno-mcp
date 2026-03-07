@@ -18,13 +18,15 @@ logger = logging.getLogger(__name__)
 class GitTools:
     """Tools for git repository operations"""
 
-    def __init__(self):
+    def __init__(self, workspace_dir: Optional[str] = None):
         """
         Initialize git tools.
 
         Sets up a workspace directory for cloned repositories.
         """
-        self.workspace_dir = os.path.join(tempfile.gettempdir(), "project")
+        self.workspace_dir = workspace_dir or os.path.join(
+            tempfile.gettempdir(), "pwno", "repos"
+        )
         os.makedirs(self.workspace_dir, exist_ok=True)
         logger.info(f"Git workspace initialized at: {self.workspace_dir}")
 
@@ -53,7 +55,11 @@ class GitTools:
                 target_dir = repo_name
 
             # Full path for the repository
-            repo_path = os.path.join(self.workspace_dir, target_dir)
+            repo_path = (
+                target_dir
+                if os.path.isabs(target_dir)
+                else os.path.join(self.workspace_dir, target_dir)
+            )
 
             # Check if repo already exists
             if os.path.exists(repo_path):

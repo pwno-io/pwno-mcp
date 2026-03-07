@@ -8,7 +8,7 @@ Each tool returns immediate results suitable for LLM interaction.
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from pwnomcp.gdb import GdbController
-from pwnomcp.state import SessionState
+from pwnomcp.state.session import SessionState
 
 logger = logging.getLogger(__name__)
 

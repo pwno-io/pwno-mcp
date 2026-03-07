@@ -33,6 +33,7 @@ and helper tooling over the Model Context Protocol (MCP) for agentic coding clie
 - Deterministic execution control via GDB/MI (load/run/attach, breakpoints, stepping, interrupt/poll)
 - Fast context snapshots for LLMs (registers, stack, disassembly, source, backtrace) plus direct memory reads
 - Exploit workflow support with an optional `pwncli` driver for interactive I/O and event polling
+- Multi-session support for parallel exploitation/debugging (`session_id` and PID lookup)
 - Build + automation helpers inside the same environment (run shell commands, manage background processes, fetch repos, run Python)
 - Optional RetDec integration to fetch and cache a decompilation (`BINARY_URL` env var)
 - Designed for containerized usage; supports Streamable HTTP and stdio transports; nonce auth exists but is disabled by default
@@ -43,12 +44,12 @@ and helper tooling over the Model Context Protocol (MCP) for agentic coding clie
 Create a `./workspace` folder in your current project directory, put your target
 binary there, start the server, then connect your MCP client.
 
-1. From your current project directory, create `./workspace` and place your target binary there (name it `target`):
+1. From your current project directory, create `./workspace` and place your target binary there (you can keep its original filename):
 
 ```bash
 mkdir -p ./workspace
-cp ./path/to/your/binary ./workspace/target
-chmod +x ./workspace/target
+cp ./path/to/your/binary ./workspace/chal
+chmod +x ./workspace/chal
 ```
 
 2. Pick transport:
@@ -190,7 +191,7 @@ Cursor MCP config locations:
 - Project: `.cursor/mcp.json`
 - Global: `~/.cursor/mcp.json`
 
-If you use project config, keep your binary at `PROJECT_ROOT/workspace/target`.
+If you use project config, keep your binary under `PROJECT_ROOT/workspace/`.
 
 HTTP example:
 
@@ -348,18 +349,18 @@ run one quick end-to-end check with your agent.
 Ask your agent:
 
 ```text
-Use pwno-mcp to load /workspace/target, set a breakpoint at main, run the program,
+Use pwno-mcp to load /workspace/chal, set a breakpoint at main, run the program,
 show full context, then step once.
 ```
 
-If you followed Quick Start, the binary is `./workspace/target` on host and
-`/workspace/target` inside tool calls.
+If you followed Quick Start, the binary is `./workspace/chal` on host and
+`/workspace/chal` inside tool calls.
 
 <details>
 <summary><strong>Manual tool-call sequence (for troubleshooting only)</strong></summary>
 
 ```json
-{"tool":"set_file","arguments":{"binary_path":"/workspace/target"}}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal"}}
 {"tool":"set_breakpoint","arguments":{"location":"main"}}
 {"tool":"run","arguments":{"args":""}}
 {"tool":"get_context","arguments":{"context_type":"all"}}
@@ -378,7 +379,7 @@ Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
 `set_file` loads an executable into GDB/pwndbg.
 
 ```json
-{"tool":"set_file","arguments":{"binary_path":"/workspace/target"}}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal"}}
 ```
 
 `set_breakpoint` sets a breakpoint by symbol/address/file:line, with optional condition.
@@ -423,16 +424,24 @@ Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
 {"tool":"get_session_info","arguments":{}}
 ```
 
+`create_debug_session` creates or returns an isolated debugger session for parallel workflows.
+
+```json
+{"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
+```
+
+Most debugger tools (`set_file`, `run`, `attach`, `get_context`, etc.) accept `session_id` and optional `process_id` selectors.
+
 `run_command` executes shell commands (compile/build helpers) in `/workspace` by default.
 
 ```json
-{"tool":"run_command","arguments":{"command":"gcc -g vuln.c -o target","cwd":"/workspace","timeout":30.0}}
+{"tool":"run_command","arguments":{"command":"gcc -g vuln.c -o chal","cwd":"/workspace","timeout":30.0}}
 ```
 
 `spawn_process` starts a background process.
 
 ```json
-{"tool":"spawn_process","arguments":{"command":"./target","cwd":"/workspace"}}
+{"tool":"spawn_process","arguments":{"command":"./chal","cwd":"/workspace"}}
 ```
 
 `get_process` checks spawned process status.

@@ -9,6 +9,7 @@ Maintains the current debugging session state including:
 """
 
 import logging
+import uuid
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -57,7 +58,7 @@ class SessionState:
     command_history: List[Dict[str, Any]] = field(default_factory=list)
 
     # Session metadata
-    session_id: str = field(default_factory=lambda: datetime.now().isoformat())
+    session_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     created_at: datetime = field(default_factory=datetime.now)
 
     def add_breakpoint(

@@ -1,0 +1,187 @@
+"""Multi-session debug registry for Pwno MCP."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import datetime
+import logging
+import os
+import threading
+import uuid
+from typing import Dict, List, Optional, Any
+
+from pwnomcp.gdb import GdbController
+from pwnomcp.state.session import SessionState
+from pwnomcp.tools import PwndbgTools
+from pwnomcp.utils.paths import RuntimePaths, sanitize_session_id
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class DebugSession:
+    """Container for a full debugger session and associated resources."""
+
+    session_id: str
+    runtime_dir: str
+    gdb: GdbController
+    state: SessionState
+    tools: PwndbgTools
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    lock: threading.RLock = field(default_factory=threading.RLock)
+    driver_pid: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize lightweight metadata for API responses."""
+        return {
+            "session_id": self.session_id,
+            "created_at": self.created_at.isoformat(),
+            "runtime_dir": self.runtime_dir,
+            "binary_path": self.state.binary_path,
+            "binary_loaded": self.state.binary_loaded,
+            "inferior_pid": self.state.pid,
+            "driver_pid": self.driver_pid,
+            "state": self.state.state,
+            "gdb_state": self.gdb.get_state(),
+        }
+
+
+class DebugSessionRegistry:
+    """Tracks independent debugger sessions keyed by session id and PIDs."""
+
+    def __init__(self, runtime_paths: RuntimePaths):
+        self.runtime_paths = runtime_paths
+        self.sessions: Dict[str, DebugSession] = {}
+        self.inferior_pid_index: Dict[int, str] = {}
+        self.driver_pid_index: Dict[int, str] = {}
+        self.default_session_id: Optional[str] = None
+        self._lock = threading.RLock()
+
+    def _new_session_id(self) -> str:
+        return uuid.uuid4().hex[:12]
+
+    def _runtime_dir_for(self, session_id: str) -> str:
+        path = os.path.join(
+            self.runtime_paths.sessions_dir, sanitize_session_id(session_id)
+        )
+        os.makedirs(path, exist_ok=True)
+        return path
+
+    def create_session(self, session_id: Optional[str] = None) -> DebugSession:
+        """Create (or return existing) debugger session by id."""
+        with self._lock:
+            chosen_id = (
+                sanitize_session_id(session_id)
+                if session_id
+                else self._new_session_id()
+            )
+            if chosen_id in self.sessions:
+                return self.sessions[chosen_id]
+
+            runtime_dir = self._runtime_dir_for(chosen_id)
+            gdb = GdbController()
+            state = SessionState(session_id=chosen_id)
+            tools = PwndbgTools(gdb, state)
+            session = DebugSession(
+                session_id=chosen_id,
+                runtime_dir=runtime_dir,
+                gdb=gdb,
+                state=state,
+                tools=tools,
+            )
+            self.sessions[chosen_id] = session
+            if self.default_session_id is None:
+                self.default_session_id = chosen_id
+            logger.info("Created debug session '%s'", chosen_id)
+            return session
+
+    def get_session(self, session_id: str) -> Optional[DebugSession]:
+        lookup_id = sanitize_session_id(session_id)
+        with self._lock:
+            return self.sessions.get(lookup_id)
+
+    def ensure_session(self, session_id: Optional[str] = None) -> DebugSession:
+        """Return an existing session, creating if necessary."""
+        with self._lock:
+            if session_id:
+                existing = self.sessions.get(session_id)
+                if existing:
+                    return existing
+                return self.create_session(session_id)
+
+            if self.default_session_id and self.default_session_id in self.sessions:
+                return self.sessions[self.default_session_id]
+            return self.create_session("default")
+
+    def get_session_for_pid(self, pid: int) -> Optional[DebugSession]:
+        """Resolve session by driver PID first, then inferior PID."""
+        with self._lock:
+            sid = self.driver_pid_index.get(pid)
+            if sid and sid in self.sessions:
+                return self.sessions[sid]
+            sid = self.inferior_pid_index.get(pid)
+            if sid and sid in self.sessions:
+                return self.sessions[sid]
+            return None
+
+    def register_driver_pid(self, session_id: str, pid: int) -> None:
+        with self._lock:
+            if session_id not in self.sessions:
+                return
+            self.sessions[session_id].driver_pid = pid
+            self.driver_pid_index[pid] = session_id
+
+    def register_inferior_pid(self, session_id: str, pid: Optional[int]) -> None:
+        if pid is None:
+            return
+        with self._lock:
+            if session_id not in self.sessions:
+                return
+            self.sessions[session_id].state.pid = pid
+            self.inferior_pid_index[pid] = session_id
+
+    def unregister_driver_pid(self, pid: int) -> None:
+        with self._lock:
+            sid = self.driver_pid_index.pop(pid, None)
+            if sid and sid in self.sessions and self.sessions[sid].driver_pid == pid:
+                self.sessions[sid].driver_pid = None
+
+    def list_sessions(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            return [session.to_dict() for session in self.sessions.values()]
+
+    def close_session(self, session_id: str) -> Dict[str, Any]:
+        """Close a session and release associated resources."""
+        lookup_id = sanitize_session_id(session_id)
+        with self._lock:
+            session = self.sessions.pop(lookup_id, None)
+            if not session:
+                return {
+                    "success": False,
+                    "error": f"Session '{lookup_id}' not found",
+                }
+
+            for pid, sid in list(self.driver_pid_index.items()):
+                if sid == lookup_id:
+                    self.driver_pid_index.pop(pid, None)
+
+            for pid, sid in list(self.inferior_pid_index.items()):
+                if sid == lookup_id:
+                    self.inferior_pid_index.pop(pid, None)
+
+            try:
+                session.gdb.close()
+            except Exception:
+                logger.exception("Failed to close gdb for session '%s'", lookup_id)
+
+            if self.default_session_id == lookup_id:
+                self.default_session_id = next(iter(self.sessions), None)
+
+            logger.info("Closed debug session '%s'", lookup_id)
+            return {"success": True, "session_id": lookup_id}
+
+    def close_all(self) -> None:
+        """Close all tracked sessions."""
+        with self._lock:
+            for session_id in list(self.sessions.keys()):
+                self.close_session(session_id)

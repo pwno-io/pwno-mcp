@@ -1,11 +1,12 @@
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, cast
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 # Reuse the already-initialized runtime context from the MCP router
 from pwnomcp.router import mcp as mcp_router
+from pwnomcp.utils.paths import DEFAULT_WORKSPACE, resolve_workspace_path
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,8 @@ class AttachRequest(BaseModel):
     - pid: target process id to attach
     - after: list of GDB commands to execute after successful attach
     - where: optional binary path to set as debug target before pre (can be skipped if pre-setted)
+    - session_id: optional debug session identifier for parallel workflows
+    - script_pid: optional exploit driver pid for session lookup
     """
 
     pre: Optional[List[str]] = Field(default=None)
@@ -25,6 +28,7 @@ class AttachRequest(BaseModel):
     after: Optional[List[str]] = Field(default=None)
     where: Optional[str] = Field(default=None)
     script_pid: Optional[int] = Field(default=None)
+    session_id: Optional[str] = Field(default=None)
 
 
 class AttachResponse(BaseModel):
@@ -38,14 +42,27 @@ class AttachResponse(BaseModel):
 app = FastAPI(title="pwno-mcp attach", version="0.1.0")
 
 
-def _get_tools():
-    """Obtain the shared PwndbgTools instance from the MCP router."""
+def _resolve_session(body: AttachRequest):
+    """Resolve target debug session from session_id or script pid."""
+    registry = mcp_router.session_registry
+    if registry is not None:
+        session = None
+        if body.session_id:
+            session = registry.get_session(body.session_id)
+            if session is None:
+                session = registry.create_session(body.session_id)
+        elif body.script_pid is not None:
+            session = registry.get_session_for_pid(body.script_pid)
+        if session is None:
+            session = registry.ensure_session(mcp_router.default_session_id)
+        return session
+
     tools = mcp_router.pwndbg_tools
     if tools is None:
         raise RuntimeError(
             "pwndbg_tools not initialized; ensure server set_runtime_context was called"
         )
-    return tools
+    return None
 
 
 @app.get("/")
@@ -63,14 +80,22 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
     - result: mapping {command: command_result_dict} for all executed commands
     """
 
-    tools = _get_tools()
+    session = _resolve_session(body)
+    tools = session.tools if session is not None else mcp_router.pwndbg_tools
+    assert tools is not None
     command_results: Dict[str, Any] = {}
 
     # Optionally set the binary file prior to pre-commands
     if body.where:
         try:
-            logger.info("[attach] set-file: %s", body.where)
-            set_res = tools.set_file(body.where)
+            resolved_binary = resolve_workspace_path(
+                body.where,
+                workspace_root=DEFAULT_WORKSPACE,
+                require_exists=False,
+                kind="where",
+            )
+            logger.info("[attach] set-file: %s", resolved_binary)
+            set_res = tools.set_file(resolved_binary)
             command_results["set-file"] = set_res
         except Exception as e:
             logger.exception("Error setting file: %s", body.where)
@@ -94,6 +119,9 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
         attach_result, _ = tools.attach(body.pid)
         logger.info("[attach] attach result: %s", attach_result)
         attach_success = bool(attach_result.get("success"))
+        registry = cast(Optional[Any], mcp_router.session_registry)
+        if attach_success and session is not None and registry is not None:
+            registry.register_inferior_pid(session.session_id, body.pid)
         # Selectively expose key fields only
         attach_info = {
             "command": attach_result.get("command"),
@@ -101,6 +129,7 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
             "state": attach_result.get("state"),
             "pid": attach_result.get("pid"),
             "script_pid": body.script_pid,
+            "session_id": session.session_id if session is not None else None,
         }
     except Exception:
         logger.exception("Error attaching to pid %s", body.pid)

@@ -27,14 +27,16 @@ class PythonTools:
         "pwntools",
     ]
 
-    def __init__(self):
+    def __init__(self, workspace_dir: Optional[str] = None):
         """
         Initialize Python tools with a single shared venv.
         """
-        self.workspace_dir = os.path.join(
-            tempfile.gettempdir(), "pwno_python_workspace"
+        self.workspace_dir = workspace_dir or os.path.join(
+            tempfile.gettempdir(), "pwno", "python"
         )
         os.makedirs(self.workspace_dir, exist_ok=True)
+        self.scripts_dir = os.path.join(self.workspace_dir, "scripts")
+        os.makedirs(self.scripts_dir, exist_ok=True)
         self.venv_path = os.path.join(self.workspace_dir, "shared_venv")
         logger.info(f"Python workspace initialized at: {self.workspace_dir}")
 
@@ -147,7 +149,9 @@ class PythonTools:
         """
         try:
             # Create temporary script file
-            fd, script_path = tempfile.mkstemp(suffix=".py", prefix="pwno_script_")
+            fd, script_path = tempfile.mkstemp(
+                suffix=".py", prefix="pwno_script_", dir=self.scripts_dir
+            )
             with os.fdopen(fd, "w") as f:
                 f.write(code)
 
@@ -261,7 +265,9 @@ class PythonTools:
         :param code: Python code to write to a temporary file
         :returns: Path to the created temporary .py file
         """
-        fd, script_path = tempfile.mkstemp(suffix=".py", prefix="pwno_script_")
+        fd, script_path = tempfile.mkstemp(
+            suffix=".py", prefix="pwno_script_", dir=self.scripts_dir
+        )
         with os.fdopen(fd, "w") as f:
             f.write(code)
         return script_path

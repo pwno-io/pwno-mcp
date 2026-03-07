@@ -10,16 +10,15 @@ from pwnomcp.gdb import GdbController
 from pwnomcp.retdec.retdec import RetDecAnalyzer
 from pwnomcp.router import attach as attach_router
 from pwnomcp.router import mcp as mcp_router
-from pwnomcp.state import SessionState
+from pwnomcp.state import DebugSessionRegistry, SessionState
 from pwnomcp.tools import GitTools, PwndbgTools, PythonTools, SubprocessTools
+from pwnomcp.utils.paths import DEFAULT_WORKSPACE, RuntimePaths, build_runtime_paths
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-DEFAULT_WORKSPACE = "/workspace"
 
 gdb_controller: Optional[GdbController] = None
 session_state: Optional[SessionState] = None
@@ -28,6 +27,8 @@ subprocess_tools: Optional[SubprocessTools] = None
 git_tools: Optional[GitTools] = None
 python_tools: Optional[PythonTools] = None
 retdec_analyzer: Optional[RetDecAnalyzer] = None
+session_registry: Optional[DebugSessionRegistry] = None
+runtime_paths: Optional[RuntimePaths] = None
 
 
 @dataclass
@@ -45,7 +46,7 @@ def _initialize_components() -> None:
     This helper is shared between HTTP mode and stdio mode so both transports
     share identical initialization semantics.
     """
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer, session_registry, runtime_paths
 
     if not os.path.exists(DEFAULT_WORKSPACE):
         try:
@@ -57,12 +58,16 @@ def _initialize_components() -> None:
             )
             logger.info("Continuing without default workspace directory")
 
-    gdb_controller = GdbController()
-    session_state = SessionState()
-    pwndbg_tools = PwndbgTools(gdb_controller, session_state)
-    subprocess_tools = SubprocessTools()
-    git_tools = GitTools()
-    python_tools = PythonTools()
+    runtime_paths = build_runtime_paths(DEFAULT_WORKSPACE)
+    session_registry = DebugSessionRegistry(runtime_paths)
+    default_session = session_registry.create_session("default")
+
+    gdb_controller = default_session.gdb
+    session_state = default_session.state
+    pwndbg_tools = default_session.tools
+    subprocess_tools = SubprocessTools(process_root=runtime_paths.processes_dir)
+    git_tools = GitTools(workspace_dir=runtime_paths.repos_dir)
+    python_tools = PythonTools(workspace_dir=runtime_paths.python_dir)
     retdec_analyzer = RetDecAnalyzer()
 
     init_result = gdb_controller.initialize()
@@ -70,23 +75,23 @@ def _initialize_components() -> None:
     logger.info("RetDec analyzer created (lazy initialization)")
 
     mcp_router.set_runtime_context(
-        gdb_controller,
-        session_state,
-        pwndbg_tools,
-        subprocess_tools,
-        git_tools,
-        python_tools,
-        retdec_analyzer,
+        session_registry_=session_registry,
+        default_session_id_=default_session.session_id,
+        subprocess_=subprocess_tools,
+        git_=git_tools,
+        python_=python_tools,
+        retdec=retdec_analyzer,
+        runtime_paths_=runtime_paths,
     )
 
 
 def _shutdown_components() -> None:
     """Tear down global components created during initialization."""
-    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer
+    global gdb_controller, session_state, pwndbg_tools, subprocess_tools, git_tools, python_tools, retdec_analyzer, session_registry, runtime_paths
 
     logger.info("Shutting down Pwno MCP server components...")
-    if gdb_controller:
-        gdb_controller.close()
+    if session_registry:
+        session_registry.close_all()
 
     gdb_controller = None
     session_state = None
@@ -95,6 +100,8 @@ def _shutdown_components() -> None:
     git_tools = None
     python_tools = None
     retdec_analyzer = None
+    session_registry = None
+    runtime_paths = None
 
 
 def _configure_fastmcp(host: str, port: int, streamable_http_path: str) -> None:
