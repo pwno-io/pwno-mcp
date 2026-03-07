@@ -28,6 +28,23 @@ class FakePwndbgTools:
         return result, []
 
 
+class FakeRegistry:
+    def __init__(self, session=None):
+        self.session = session
+
+    def get_session(self, _session_id):
+        return self.session
+
+    def create_session(self, _session_id):
+        return self.session
+
+    def get_session_for_pid(self, _pid):
+        return self.session
+
+    def ensure_session(self, _default_session_id):
+        return self.session
+
+
 @pytest.mark.asyncio
 async def test_attach_endpoint_runs_pre_and_after():
     tools = FakePwndbgTools(attach_success=True)
@@ -77,3 +94,23 @@ async def test_attach_endpoint_skips_after_when_attach_fails():
 
     assert response.successful is False
     assert "should_not_run" not in response.result
+
+
+@pytest.mark.asyncio
+async def test_attach_endpoint_errors_on_missing_script_pid_mapping():
+    original_registry = mcp_router.session_registry
+    original_default_session_id = mcp_router.default_session_id
+
+    mcp_router.session_registry = FakeRegistry(session=None)
+    mcp_router.default_session_id = "default"
+
+    try:
+        body = attach_router.AttachRequest(pid=1337, script_pid=4242)
+        response = await attach_router.attach_endpoint(body)
+    finally:
+        mcp_router.session_registry = original_registry
+        mcp_router.default_session_id = original_default_session_id
+
+    assert response.successful is False
+    assert response.attach is not None
+    assert "script_pid=4242" in response.attach["error"]

@@ -1,9 +1,10 @@
 import logging
+import asyncio
 import json
 import os
 import shlex
 import time
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Optional, Dict, Any, Tuple, List, Callable, TypeVar
 from functools import wraps
 import threading
 
@@ -27,6 +28,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
 
 # Shared runtime context set by the server during startup
 gdb_controller: Optional[GdbController] = None
@@ -106,6 +108,35 @@ def catch_errors(tuple_on_error: bool = False):
         return wrapper
 
     return decorator
+
+
+async def _run_blocking(fn: Callable[[], T]) -> T:
+    """Run blocking code in a worker thread to avoid event-loop stalls."""
+    return await asyncio.to_thread(fn)
+
+
+def _run_session_locked(
+    session: DebugSession,
+    action: Callable[[], T],
+    *,
+    sync_pid: bool = True,
+) -> T:
+    with session.lock:
+        result = action()
+        if sync_pid:
+            _sync_session_pid(session)
+        return result
+
+
+async def _run_session_action(
+    session: DebugSession,
+    action: Callable[[], T],
+    *,
+    sync_pid: bool = True,
+) -> T:
+    return await _run_blocking(
+        lambda: _run_session_locked(session, action, sync_pid=sync_pid)
+    )
 
 
 def _require_session_registry() -> DebugSessionRegistry:
@@ -252,9 +283,7 @@ async def execute(
         Dict containing the raw MI/console responses, a success flag, and the current GDB state.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.execute(command)
-        _sync_session_pid(session)
+    result = await _run_session_action(session, lambda: session.tools.execute(command))
     result["session_id"] = session.session_id
     return result
 
@@ -309,6 +338,7 @@ async def pwncli(
         f.write(file)
 
     replaced = False
+    driver_pid: Optional[int] = None
     old_pipe: Optional[PwnPipe] = None
     with _pwnpipe_lock:
         old_pipe = pwnpipe_sessions.get(session.session_id)
@@ -325,16 +355,22 @@ async def pwncli(
             env={"PYTHONUNBUFFERED": "1"},
         )
         pwnpipe_sessions[session.session_id] = pipe
+        driver_pid = pipe.get_pid()
+        if driver_pid is not None:
+            _require_session_registry().register_driver_pid(
+                session.session_id, driver_pid
+            )
 
     if old_pipe and old_pipe.is_alive():
         old_pipe.kill()
 
-    startup = pipe.wait_ready(timeout=wait_timeout)
-    output = pipe.release()
-    attach_result = pipe.get_attach_result()
-    driver_pid = pipe.get_pid()
-    if driver_pid is not None:
-        _require_session_registry().register_driver_pid(session.session_id, driver_pid)
+    def _collect_startup() -> Tuple[Dict[str, Any], str, Any]:
+        startup_result = pipe.wait_ready(timeout=wait_timeout)
+        output_result = pipe.release()
+        attach_result_value = pipe.get_attach_result()
+        return startup_result, output_result, attach_result_value
+
+    startup, output, attach_result = await _run_blocking(_collect_startup)
 
     return {
         "session_id": session.session_id,
@@ -507,9 +543,9 @@ async def set_file(
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
     resolved_binary = _resolve_binary_path(binary_path, session, require_exists=True)
-    with session.lock:
-        result = session.tools.set_file(resolved_binary)
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.set_file(resolved_binary)
+    )
     result["session_id"] = session.session_id
     result["binary_path"] = resolved_binary
     return result
@@ -532,9 +568,9 @@ async def attach(
         quick context snapshots (e.g., backtrace/heap) captured immediately after attach.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result, context = session.tools.attach(pid)
-        _sync_session_pid(session)
+    result, context = await _run_session_action(
+        session, lambda: session.tools.attach(pid)
+    )
     result["session_id"] = session.session_id
     return result, context
 
@@ -557,9 +593,7 @@ async def run(
         MI run/continue results and state.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.run(args, start)
-        _sync_session_pid(session)
+    result = await _run_session_action(session, lambda: session.tools.run(args, start))
     result["session_id"] = session.session_id
     return result
 
@@ -580,9 +614,9 @@ async def step_control(
         Dict with MI responses and state.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.step_control(command)
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.step_control(command)
+    )
     result["session_id"] = session.session_id
     return result
 
@@ -600,9 +634,7 @@ async def gdb_poll(
         timeout: Maximum time to wait (seconds) for the first event.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.gdb_poll(timeout)
-        _sync_session_pid(session)
+    result = await _run_session_action(session, lambda: session.tools.gdb_poll(timeout))
     result["session_id"] = session.session_id
     return result
 
@@ -620,9 +652,9 @@ async def gdb_interrupt(
         timeout: Maximum time to wait (seconds) for stop notifications.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.gdb_interrupt(timeout)
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.gdb_interrupt(timeout)
+    )
     result["session_id"] = session.session_id
     return result
 
@@ -635,9 +667,7 @@ async def finish(
 ) -> Dict[str, Any]:
     """Run until the current function returns (MI -exec-finish)."""
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.finish()
-        _sync_session_pid(session)
+    result = await _run_session_action(session, lambda: session.tools.finish())
     result["session_id"] = session.session_id
     return result
 
@@ -655,9 +685,7 @@ async def jump(
         locspec: Location such as a symbol name, file:line, or address (*0x... ).
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.jump(locspec)
-        _sync_session_pid(session)
+    result = await _run_session_action(session, lambda: session.tools.jump(locspec))
     result["session_id"] = session.session_id
     return result
 
@@ -670,9 +698,9 @@ async def return_from_function(
 ) -> Dict[str, Any]:
     """Force the current function to return immediately (MI -exec-return)."""
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.return_from_function()
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.return_from_function()
+    )
     result["session_id"] = session.session_id
     return result
 
@@ -686,9 +714,7 @@ async def until(
 ) -> Dict[str, Any]:
     """Run until a specified location or next source line (MI -exec-until)."""
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.until(locspec)
-        _sync_session_pid(session)
+    result = await _run_session_action(session, lambda: session.tools.until(locspec))
     result["session_id"] = session.session_id
     return result
 
@@ -707,9 +733,9 @@ async def get_context(
                       to request a specific pwndbg context.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.get_context(context_type)
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.get_context(context_type)
+    )
     result["session_id"] = session.session_id
     return result
 
@@ -729,9 +755,9 @@ async def set_breakpoint(
         condition: Optional breakpoint condition expression.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.set_breakpoint(location, condition)
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.set_breakpoint(location, condition)
+    )
     result["session_id"] = session.session_id
     return result
 
@@ -753,9 +779,9 @@ async def get_memory(
         format: "hex" for raw bytes (fast path), "string" for x/s, otherwise MI grid format.
     """
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.get_memory(address, size, format)
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.get_memory(address, size, format)
+    )
     result["session_id"] = session.session_id
     return result
 
@@ -768,9 +794,9 @@ async def get_session_info(
 ) -> Dict[str, Any]:
     """Return current session info (session state + GDB state) without issuing new GDB commands."""
     session = _resolve_debug_session(session_id=session_id, process_id=process_id)
-    with session.lock:
-        result = session.tools.get_session_info()
-        _sync_session_pid(session)
+    result = await _run_session_action(
+        session, lambda: session.tools.get_session_info()
+    )
     result["session_id"] = session.session_id
     result["runtime_dir"] = session.runtime_dir
     return result
@@ -799,7 +825,9 @@ async def run_command(
             indent=2,
         )
     cwd = resolve_workspace_cwd(cwd, workspace_root=DEFAULT_WORKSPACE)
-    result = subprocess_tools.run_command(command, cwd=cwd, timeout=timeout)
+    result = await _run_blocking(
+        lambda: subprocess_tools.run_command(command, cwd=cwd, timeout=timeout)
+    )
     return json.dumps(result, indent=2)
 
 
@@ -817,7 +845,9 @@ async def spawn_process(command: str, cwd: Optional[str] = None) -> str:
             indent=2,
         )
     cwd = resolve_workspace_cwd(cwd, workspace_root=DEFAULT_WORKSPACE)
-    result = subprocess_tools.spawn_process(command, cwd=cwd)
+    result = await _run_blocking(
+        lambda: subprocess_tools.spawn_process(command, cwd=cwd)
+    )
     return json.dumps(result, indent=2)
 
 
@@ -829,7 +859,7 @@ async def get_process(pid: int) -> str:
             {"success": False, "error": "Subprocess tools not initialized"},
             indent=2,
         )
-    result = subprocess_tools.get_process(pid)
+    result = await _run_blocking(lambda: subprocess_tools.get_process(pid))
     return json.dumps(result, indent=2)
 
 
@@ -841,7 +871,7 @@ async def kill_process(pid: int, signal: int = 15) -> str:
             {"success": False, "error": "Subprocess tools not initialized"},
             indent=2,
         )
-    result = subprocess_tools.kill_process(pid, signal)
+    result = await _run_blocking(lambda: subprocess_tools.kill_process(pid, signal))
     return json.dumps(result, indent=2)
 
 
@@ -853,7 +883,7 @@ async def list_processes() -> str:
             {"success": False, "error": "Subprocess tools not initialized"},
             indent=2,
         )
-    result = subprocess_tools.list_processes()
+    result = await _run_blocking(subprocess_tools.list_processes)
     return json.dumps(result, indent=2)
 
 
@@ -886,7 +916,9 @@ async def fetch_repo(
     else:
         repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
         target_dir = os.path.join(DEFAULT_WORKSPACE, repo_name)
-    result = git_tools.fetch_repo(repo_url, version, target_dir, shallow)
+    result = await _run_blocking(
+        lambda: git_tools.fetch_repo(repo_url, version, target_dir, shallow)
+    )
     return json.dumps(result, indent=2)
 
 
@@ -918,7 +950,11 @@ async def execute_python_script(
     )
     cwd = resolve_workspace_cwd(cwd, workspace_root=DEFAULT_WORKSPACE)
     args_list = args.split() if args else None
-    result = python_tools.execute_script(resolved_script_path, args_list, cwd, timeout)
+    result = await _run_blocking(
+        lambda: python_tools.execute_script(
+            resolved_script_path, args_list, cwd, timeout
+        )
+    )
     return json.dumps(result, indent=2)
 
 
@@ -939,7 +975,7 @@ async def execute_python_code(
             indent=2,
         )
     cwd = resolve_workspace_cwd(cwd, workspace_root=DEFAULT_WORKSPACE)
-    result = python_tools.execute_code(code, cwd, timeout)
+    result = await _run_blocking(lambda: python_tools.execute_code(code, cwd, timeout))
     return json.dumps(result, indent=2)
 
 
@@ -957,7 +993,9 @@ async def install_python_packages(packages: str, upgrade: bool = False) -> str:
             indent=2,
         )
     packages_list = packages.split()
-    result = python_tools.install_packages(packages_list, upgrade)
+    result = await _run_blocking(
+        lambda: python_tools.install_packages(packages_list, upgrade)
+    )
     return json.dumps(result, indent=2)
 
 
@@ -969,7 +1007,7 @@ async def list_python_packages() -> str:
             {"success": False, "error": "Python tools not initialized"},
             indent=2,
         )
-    result = python_tools.get_installed_packages()
+    result = await _run_blocking(python_tools.get_installed_packages)
     return json.dumps(result, indent=2)
 
 
