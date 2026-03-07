@@ -223,12 +223,16 @@ async def list_debug_sessions() -> Dict[str, Any]:
 @catch_errors()
 async def close_debug_session(session_id: str) -> Dict[str, Any]:
     """Close an active debug session and stop any attached pwncli driver."""
+    registry = _require_session_registry()
+    session = registry.get_session(session_id)
+    resolved_session_id = session.session_id if session else session_id
+
     with _pwnpipe_lock:
-        pipe = pwnpipe_sessions.pop(session_id, None)
+        pipe = pwnpipe_sessions.pop(resolved_session_id, None)
     if pipe:
         pipe.kill()
 
-    result = _require_session_registry().close_session(session_id)
+    result = registry.close_session(session_id)
     return result
 
 
