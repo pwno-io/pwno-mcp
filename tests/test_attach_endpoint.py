@@ -38,12 +38,6 @@ class FakeRegistry:
     def create_session(self, _session_id):
         return self.session
 
-    def get_session_for_pid(self, _pid):
-        return self.session
-
-    def ensure_session(self, _default_session_id):
-        return self.session
-
 
 @pytest.mark.asyncio
 async def test_attach_endpoint_runs_pre_and_after():
@@ -56,7 +50,7 @@ async def test_attach_endpoint_runs_pre_and_after():
             pid=1337,
             after=["bt"],
             where="target",
-            script_pid=42,
+            session_id="chal-a",
         )
         response = await attach_router.attach_endpoint(body)
     finally:
@@ -65,7 +59,6 @@ async def test_attach_endpoint_runs_pre_and_after():
     assert response.successful is True
     assert response.attach is not None
     assert response.attach["pid"] == 1337
-    assert response.attach["script_pid"] == 42
     assert response.result["set-file"]["success"] is True
     assert "info registers" in response.result
     assert "bt" in response.result
@@ -87,6 +80,7 @@ async def test_attach_endpoint_skips_after_when_attach_fails():
             pre=["info registers"],
             pid=9001,
             after=["should_not_run"],
+            session_id="chal-a",
         )
         response = await attach_router.attach_endpoint(body)
     finally:
@@ -97,20 +91,17 @@ async def test_attach_endpoint_skips_after_when_attach_fails():
 
 
 @pytest.mark.asyncio
-async def test_attach_endpoint_errors_on_missing_script_pid_mapping():
+async def test_attach_endpoint_errors_on_missing_session_mapping():
     original_registry = mcp_router.session_registry
-    original_default_session_id = mcp_router.default_session_id
 
     mcp_router.session_registry = FakeRegistry(session=None)
-    mcp_router.default_session_id = "default"
 
     try:
-        body = attach_router.AttachRequest(pid=1337, script_pid=4242)
+        body = attach_router.AttachRequest(pid=1337, session_id="missing")
         response = await attach_router.attach_endpoint(body)
     finally:
         mcp_router.session_registry = original_registry
-        mcp_router.default_session_id = original_default_session_id
 
     assert response.successful is False
     assert response.attach is not None
-    assert "script_pid=4242" in response.attach["error"]
+    assert "missing" in response.attach["error"]

@@ -33,7 +33,7 @@ and helper tooling over the Model Context Protocol (MCP) for agentic coding clie
 - Deterministic execution control via GDB/MI (load/run/attach, breakpoints, stepping, interrupt/poll)
 - Fast context snapshots for LLMs (registers, stack, disassembly, source, backtrace) plus direct memory reads
 - Exploit workflow support with an optional `pwncli` driver for interactive I/O and event polling
-- Multi-session support for parallel exploitation/debugging (`session_id` and PID lookup)
+- Multi-session support for parallel exploitation/debugging (`session_id`-scoped workflows)
 - Build + automation helpers inside the same environment (run shell commands, manage background processes, fetch repos, run Python)
 - Optional RetDec integration to fetch and cache a decompilation (`BINARY_URL` env var)
 - Designed for containerized usage; supports Streamable HTTP and stdio transports; nonce auth exists but is disabled by default
@@ -421,7 +421,7 @@ Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
 `get_session_info` returns current session + debugger state.
 
 ```json
-{"tool":"get_session_info","arguments":{}}
+{"tool":"get_session_info","arguments":{"session_id":"chal-a"}}
 ```
 
 `create_debug_session` creates or returns an isolated debugger session for parallel workflows.
@@ -430,7 +430,7 @@ Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
 {"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
 ```
 
-Most debugger tools (`set_file`, `run`, `attach`, `get_context`, etc.) accept `session_id` and optional `process_id` selectors.
+Most debugger tools (`set_file`, `run`, `attach`, `get_context`, etc.) require explicit `session_id` selectors.
 
 `run_command` executes shell commands (compile/build helpers) in `/workspace` by default.
 

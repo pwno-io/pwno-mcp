@@ -29,10 +29,9 @@ def _normalize_script_lines(script: str) -> List[str]:
 
 def attach(
     pid: int,
+    session_id: str,
     gdbscript: Optional[Iterable[str]] = None,
     artifact_path: Optional[str] = None,
-    session_id: Optional[str] = None,
-    script_pid: Optional[int] = None,
     base_url: str = DEFAULT_ATTACH_BASE_URL,
     timeout: float = 10.0,
 ) -> AttachResponse:
@@ -45,10 +44,9 @@ def attach(
 
     Args:
         pid: Target process ID to attach to.
+        session_id: Debug session identifier.
         gdbscript: Optional iterable of commands executed before attaching.
         artifact_path: Optional path to the target binary (mapped to AttachRequest.where).
-        session_id: Optional debug session identifier.
-        script_pid: Optional PID of the driving exploit script.
         base_url: Base URL of the attach server (default http://127.0.0.1:5501).
         timeout: HTTP request timeout in seconds.
 
@@ -61,7 +59,6 @@ def attach(
         pid=pid,
         where=artifact_path,
         after=None,
-        script_pid=script_pid,
         session_id=session_id,
     )
 

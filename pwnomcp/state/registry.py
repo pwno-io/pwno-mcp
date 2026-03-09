@@ -47,13 +47,11 @@ class DebugSession:
 
 
 class DebugSessionRegistry:
-    """Tracks independent debugger sessions keyed by session id and PIDs."""
+    """Tracks independent debugger sessions keyed by session id."""
 
     def __init__(self, runtime_paths: RuntimePaths):
         self.runtime_paths = runtime_paths
         self.sessions: Dict[str, DebugSession] = {}
-        self.inferior_pid_index: Dict[int, str] = {}
-        self.driver_pid_index: Dict[int, str] = {}
         self.default_session_id: Optional[str] = None
         self._lock = threading.RLock()
 
@@ -113,39 +111,6 @@ class DebugSessionRegistry:
                 return self.sessions[self.default_session_id]
             return self.create_session("default")
 
-    def get_session_for_pid(self, pid: int) -> Optional[DebugSession]:
-        """Resolve session by driver PID first, then inferior PID."""
-        with self._lock:
-            sid = self.driver_pid_index.get(pid)
-            if sid and sid in self.sessions:
-                return self.sessions[sid]
-            sid = self.inferior_pid_index.get(pid)
-            if sid and sid in self.sessions:
-                return self.sessions[sid]
-            return None
-
-    def register_driver_pid(self, session_id: str, pid: int) -> None:
-        with self._lock:
-            if session_id not in self.sessions:
-                return
-            self.sessions[session_id].driver_pid = pid
-            self.driver_pid_index[pid] = session_id
-
-    def register_inferior_pid(self, session_id: str, pid: Optional[int]) -> None:
-        if pid is None:
-            return
-        with self._lock:
-            if session_id not in self.sessions:
-                return
-            self.sessions[session_id].state.pid = pid
-            self.inferior_pid_index[pid] = session_id
-
-    def unregister_driver_pid(self, pid: int) -> None:
-        with self._lock:
-            sid = self.driver_pid_index.pop(pid, None)
-            if sid and sid in self.sessions and self.sessions[sid].driver_pid == pid:
-                self.sessions[sid].driver_pid = None
-
     def list_sessions(self) -> List[Dict[str, Any]]:
         with self._lock:
             return [session.to_dict() for session in self.sessions.values()]
@@ -160,14 +125,6 @@ class DebugSessionRegistry:
                     "success": False,
                     "error": f"Session '{lookup_id}' not found",
                 }
-
-            for pid, sid in list(self.driver_pid_index.items()):
-                if sid == lookup_id:
-                    self.driver_pid_index.pop(pid, None)
-
-            for pid, sid in list(self.inferior_pid_index.items()):
-                if sid == lookup_id:
-                    self.inferior_pid_index.pop(pid, None)
 
             try:
                 session.gdb.close()

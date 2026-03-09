@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import List, Optional, Dict, Any, Tuple, cast
+from typing import List, Optional, Dict, Any, Tuple
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -20,16 +20,14 @@ class AttachRequest(BaseModel):
     - pid: target process id to attach
     - after: list of GDB commands to execute after successful attach
     - where: optional binary path to set as debug target before pre (can be skipped if pre-setted)
-    - session_id: optional debug session identifier for parallel workflows
-    - script_pid: optional exploit driver pid for session lookup
+    - session_id: debug session identifier for parallel workflows
     """
 
     pre: Optional[List[str]] = Field(default=None)
     pid: int
     after: Optional[List[str]] = Field(default=None)
     where: Optional[str] = Field(default=None)
-    script_pid: Optional[int] = Field(default=None)
-    session_id: Optional[str] = Field(default=None)
+    session_id: str
 
 
 class AttachResponse(BaseModel):
@@ -44,25 +42,13 @@ app = FastAPI(title="pwno-mcp attach", version="0.1.0")
 
 
 def _resolve_session(body: AttachRequest):
-    """Resolve target debug session from session_id or script pid."""
+    """Resolve target debug session from session_id."""
     registry = mcp_router.session_registry
     if registry is not None:
-        if body.session_id:
-            session = registry.get_session(body.session_id)
-            if session is None:
-                session = registry.create_session(body.session_id)
-            return session
-
-        if body.script_pid is not None:
-            session = registry.get_session_for_pid(body.script_pid)
-            if session is None:
-                raise RuntimeError(
-                    f"No debug session found for script_pid={body.script_pid}. "
-                    "Pass session_id explicitly or retry after pwncli startup."
-                )
-            return session
-
-        return registry.ensure_session(mcp_router.default_session_id)
+        session = registry.get_session(body.session_id)
+        if session is None:
+            raise RuntimeError(f"Debug session '{body.session_id}' not found")
+        return session
 
     tools = mcp_router.pwndbg_tools
     if tools is None:
@@ -96,7 +82,6 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
                 "success": False,
                 "error": str(exc),
                 "pid": body.pid,
-                "script_pid": body.script_pid,
                 "session_id": body.session_id,
             },
             result={},
@@ -141,16 +126,14 @@ async def attach_endpoint(body: AttachRequest) -> AttachResponse:
             attach_result, _ = tools.attach(body.pid)
             logger.info("[attach] attach result: %s", attach_result)
             attach_success = bool(attach_result.get("success"))
-            registry = cast(Optional[Any], mcp_router.session_registry)
-            if attach_success and session is not None and registry is not None:
-                registry.register_inferior_pid(session.session_id, body.pid)
+            if attach_success and session is not None:
+                session.state.pid = body.pid
             # Selectively expose key fields only
             attach_info = {
                 "command": attach_result.get("command"),
                 "success": attach_success,
                 "state": attach_result.get("state"),
                 "pid": attach_result.get("pid"),
-                "script_pid": body.script_pid,
                 "session_id": session.session_id if session is not None else None,
             }
         except Exception:

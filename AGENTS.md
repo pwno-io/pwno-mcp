@@ -136,7 +136,7 @@ python -m pytest -k "keyword"
 - Use `/workspace` for runtime command execution (see `DEFAULT_WORKSPACE`).
 - Do not assume a host OS path; code runs in containers often.
 - Do not require binaries to be named `target`; pass explicit binary paths under `/workspace`.
-- For parallel workflows, pass `session_id` (or PID when available) to keep actions scoped to the right exploitation session.
+- For parallel workflows, pass `session_id` to keep actions scoped to the right exploitation session.
 
 ## Notes for agentic changes
 - Keep API responses consistent with existing tool output patterns.
