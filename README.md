@@ -97,6 +97,7 @@ docker run --rm -i \
 Notes:
 
 - `http_path` defaults to `/mcp`.
+- HTTP health endpoint is exposed at `/healthz`.
 - Attach helper API defaults to `127.0.0.1:5501` inside the server runtime.
 
 ## MCP Client Setup
@@ -470,6 +471,7 @@ Most debugger tools (`set_file`, `run`, `attach`, `get_context`, etc.) require e
 - `binary_path` not found: path must exist inside server runtime (Docker usually means `/workspace/...`).
 - GDB attach/ptrace permission errors: keep `SYS_PTRACE`, `SYS_ADMIN`, and unconfined seccomp/apparmor flags.
 - HTTP connection failures: ensure container publishes `-p 5500:5500` and client URL is exactly `http://127.0.0.1:5500/mcp` unless you changed the path.
+- Liveness/readiness probes should target `http://127.0.0.1:5500/healthz`.
 
 ## Develop
 

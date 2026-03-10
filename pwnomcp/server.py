@@ -3,6 +3,7 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
+from pwnomcp.http.health import register_health_routes
 from pwnomcp.lifespan import create_lifespan
 from pwnomcp.services import AppServices
 from pwnomcp.tools import register_all_tools
@@ -18,6 +19,7 @@ def create_mcp(services: Optional[AppServices] = None) -> FastMCP:
         name="pwno-mcp",
         lifespan=create_lifespan(services=services),
     )
+    register_health_routes(mcp)
     register_all_tools(mcp)
     return mcp
 
