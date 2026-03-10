@@ -19,7 +19,8 @@ def register(mcp: FastMCP) -> None:
         """Execute non-Python shell commands and wait for completion.
 
         Best for compile/build/helper commands; for Python snippets or .py files,
-        prefer execute_python_code or execute_python_script.
+        prefer execute_python_code or execute_python_script. `cwd` is resolved
+        inside the container under /workspace and defaults to /workspace.
         """
         services = get_services(ctx)
         tools = services.subprocess_tools
@@ -35,7 +36,11 @@ def register(mcp: FastMCP) -> None:
         cwd: Optional[str] = None,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Spawn a long-running background process and return metadata."""
+        """Spawn a long-running background process and return metadata.
+
+        `cwd` is resolved inside the container under /workspace and defaults to
+        /workspace when omitted.
+        """
         services = get_services(ctx)
         tools = services.subprocess_tools
         cwd = resolve_workspace_cwd(cwd, workspace_root=DEFAULT_WORKSPACE)

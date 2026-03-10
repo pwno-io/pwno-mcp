@@ -99,6 +99,7 @@ Notes:
 - `http_path` defaults to `/mcp`.
 - HTTP health endpoint is exposed at `/healthz`.
 - Attach helper API defaults to `127.0.0.1:5501` inside the server runtime.
+- Tool path arguments should use in-container paths under `/workspace` (or relative paths that resolve under `/workspace`).
 
 ## MCP Client Setup
 

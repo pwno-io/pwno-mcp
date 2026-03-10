@@ -33,6 +33,7 @@ def register(mcp: FastMCP) -> None:
         """Run a transient pwncli exploit driver from inline script content.
 
         This stores code in session runtime state; only create persistent /workspace scripts when the user explicitly requests it.
+        `binary_path` should use a container-visible path under /workspace.
         """
         services = get_services(ctx)
         session = resolve_debug_session(

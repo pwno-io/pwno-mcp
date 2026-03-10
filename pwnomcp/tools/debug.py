@@ -81,7 +81,12 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Load an executable file into GDB/pwndbg for debugging."""
+        """Load an executable file into GDB/pwndbg for debugging.
+
+        Use a container-visible path under /workspace (or a relative path, which
+        resolves under /workspace). If your host file is ./workspace/chal, pass
+        /workspace/chal here.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False

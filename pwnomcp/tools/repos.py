@@ -18,7 +18,11 @@ def register(mcp: FastMCP) -> None:
         shallow: bool = True,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Fetch a git repository into /workspace."""
+        """Fetch a git repository into /workspace.
+
+        `target_dir`, when provided, must be inside the container under
+        /workspace; relative paths resolve under /workspace.
+        """
         services = get_services(ctx)
         tools = services.git_tools
         if target_dir:

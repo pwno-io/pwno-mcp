@@ -93,6 +93,9 @@ def resolve_workspace_path(
     - absolute paths already under /workspace
     - relative paths (resolved under /workspace)
     - host absolute paths containing '/workspace/...', remapped to container path
+
+    The server runs inside a container. Tool path arguments should use container
+    paths under /workspace (or relative paths that resolve there).
     """
     if not raw_path or not raw_path.strip():
         raise ValueError(f"{kind} cannot be empty")
@@ -108,8 +111,10 @@ def resolve_workspace_path(
                 candidate = mapped
             else:
                 raise ValueError(
-                    f"{kind} must be in {workspace_root}. "
-                    f"Got '{raw_path}'. Use a container path like '{workspace_root}/<name>'."
+                    f"{kind} must be accessible inside the container under "
+                    f"{workspace_root}. Got '{raw_path}'. Host paths are not "
+                    f"directly visible; use '{workspace_root}/<name>' or a "
+                    "relative path."
                 )
     else:
         normalized_rel = candidate
@@ -121,12 +126,13 @@ def resolve_workspace_path(
         if not _within(candidate, workspace_root):
             raise ValueError(
                 f"{kind} escapes {workspace_root}: '{raw_path}'. "
-                f"Use a safe path under {workspace_root}."
+                f"Use a safe path under {workspace_root} (or a relative path)."
             )
 
     if require_exists and not os.path.exists(candidate):
         raise FileNotFoundError(
-            f"{kind} not found: '{candidate}'. Ensure the file exists in {workspace_root}."
+            f"{kind} not found: '{candidate}'. Ensure it exists in {workspace_root}. "
+            f"In Docker, host './workspace/<name>' maps to '{workspace_root}/<name>'."
         )
 
     return candidate

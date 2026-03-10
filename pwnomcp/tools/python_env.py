@@ -23,8 +23,9 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         """Execute an existing Python script in the shared environment.
 
-        Use this when a .py file already exists; for one-off snippets,
-        prefer execute_python_code.
+        Use this when a .py file already exists; for one-off snippets, prefer
+        execute_python_code. `script_path` and `cwd` should point inside the
+        container under /workspace.
         """
         services = get_services(ctx)
         tools = services.python_tools
@@ -51,6 +52,7 @@ def register(mcp: FastMCP) -> None:
         """Execute ad-hoc Python code using a temporary runtime script.
 
         Prefer this for quick probes and analysis, and only persist files in /workspace when the user explicitly asks.
+        If provided, `cwd` is resolved inside the container under /workspace.
         """
         services = get_services(ctx)
         tools = services.python_tools

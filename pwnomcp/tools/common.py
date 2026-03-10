@@ -126,7 +126,8 @@ def resolve_binary_path(
         return fallback
     raise RuntimeError(
         "No binary selected. Provide binary_path or call set_file first. "
-        "Binaries are expected under /workspace."
+        "Binaries must be container-visible under /workspace "
+        "(for example, host './workspace/chal' becomes '/workspace/chal')."
     )
 
 

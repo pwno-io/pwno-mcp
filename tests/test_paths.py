@@ -21,8 +21,32 @@ def test_resolve_workspace_path_from_host_mounted_workspace_path():
 
 
 def test_resolve_workspace_path_rejects_outside_workspace_absolute_path():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError) as exc:
         resolve_workspace_path("/bin/ls", workspace_root="/workspace")
+
+    message = str(exc.value)
+    assert "host paths are not directly visible" in message.lower()
+    assert "/workspace/<name>" in message
+
+
+def test_resolve_workspace_path_rejects_escape_from_relative_path():
+    with pytest.raises(ValueError) as exc:
+        resolve_workspace_path("../../etc/passwd", workspace_root="/workspace")
+
+    message = str(exc.value)
+    assert "escapes /workspace" in message
+    assert "relative path" in message.lower()
+
+
+def test_resolve_workspace_path_missing_file_has_mount_hint():
+    with pytest.raises(FileNotFoundError) as exc:
+        resolve_workspace_path(
+            "missing/chal", workspace_root="/workspace", require_exists=True
+        )
+
+    message = str(exc.value)
+    assert "not found" in message.lower()
+    assert "host './workspace/<name>' maps to '/workspace/<name>'" in message
 
 
 def test_build_runtime_paths_creates_isolated_directories(tmp_path):
