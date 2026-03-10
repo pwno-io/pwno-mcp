@@ -1,6 +1,6 @@
 import pytest
 
-from pwnomcp.router.mcp import catch_errors
+from pwnomcp.tools.common import catch_errors
 
 
 @pytest.mark.asyncio

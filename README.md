@@ -1,7 +1,7 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/a4172caf-a37a-4b5b-9ab0-407269e2e2f4">
-  <source media="(prefers-color-scheme: light)" srcset="https://github.com/user-attachments/assets/280a36f1-05f4-4b52-ba2c-cb73b10e9401">
-  <img alt="pwno-mcp banner" src="https://github.com/user-attachments/assets/280a36f1-05f4-4b52-ba2c-cb73b10e9401">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/pwno-mcp-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="assets/pwno-mcp-light.png">
+  <img alt="pwno-mcp banner" src="assets/pwno-mcp-light.png">
 </picture>
 
 <p align="center">stateful system for autonomous <code>pwn</code> and binary research, designed for LLMs agents.</p>
@@ -36,7 +36,7 @@ and helper tooling over the Model Context Protocol (MCP) for agentic coding clie
 - Multi-session support for parallel exploitation/debugging (`session_id`-scoped workflows)
 - Build + automation helpers inside the same environment (run shell commands, manage background processes, fetch repos, run Python)
 - Optional RetDec integration to fetch and cache a decompilation (`BINARY_URL` env var)
-- Designed for containerized usage; supports Streamable HTTP and stdio transports; nonce auth exists but is disabled by default
+- Designed for containerized usage; supports HTTP and stdio transports
 
 
 ## Quick Start (Docker + MCP)
@@ -54,12 +54,12 @@ chmod +x ./workspace/chal
 
 2. Pick transport:
 
-- Use **Streamable HTTP** when your client asks for a `url`.
+- Use **HTTP** when your client asks for a `url`.
 - Use **stdio** when your client asks for `command` + `args`.
 
 3. Start server.
 
-### Streamable HTTP mode (default transport)
+### HTTP mode (default transport)
 
 ```bash
 docker run --rm -p 5500:5500 \
@@ -77,7 +77,7 @@ This mount makes your local `./workspace` available inside the container at `/wo
 
 MCP URL for clients in this mode:
 
-- `http://127.0.0.1:5500/debug`
+- `http://127.0.0.1:5500/mcp`
 
 ### stdio mode (for local MCP clients)
 
@@ -96,7 +96,7 @@ docker run --rm -i \
 
 Notes:
 
-- `streamable_http_path` defaults to `/debug`.
+- `http_path` defaults to `/mcp`.
 - Attach helper API defaults to `127.0.0.1:5501` inside the server runtime.
 
 ## MCP Client Setup
@@ -151,7 +151,7 @@ Claude Code supports both remote HTTP MCP servers and local stdio MCP servers.
 2. From your project root, add the server:
 
 ```bash
-claude mcp add --transport http --scope project pwno-mcp http://127.0.0.1:5500/debug
+claude mcp add --transport http --scope project pwno-mcp http://127.0.0.1:5500/mcp
 ```
 
 3. In Claude Code, run `/mcp` to verify `pwno-mcp` is connected.
@@ -199,7 +199,7 @@ HTTP example:
 {
   "mcpServers": {
     "pwno-mcp": {
-      "url": "http://127.0.0.1:5500/debug"
+      "url": "http://127.0.0.1:5500/mcp"
     }
   }
 }
@@ -251,7 +251,7 @@ Remote HTTP server example:
   "mcp": {
     "pwno-mcp": {
       "type": "remote",
-      "url": "http://127.0.0.1:5500/debug",
+      "url": "http://127.0.0.1:5500/mcp",
       "enabled": true
     }
   }
@@ -306,7 +306,7 @@ HTTP example:
 
 ```toml
 [mcp_servers.pwno-mcp]
-url = "http://127.0.0.1:5500/debug"
+url = "http://127.0.0.1:5500/mcp"
 ```
 
 Stdio example:
@@ -469,7 +469,7 @@ Most debugger tools (`set_file`, `run`, `attach`, `get_context`, etc.) require e
 - `No binary loaded. Use set_file first.`: call `set_file` before `run`.
 - `binary_path` not found: path must exist inside server runtime (Docker usually means `/workspace/...`).
 - GDB attach/ptrace permission errors: keep `SYS_PTRACE`, `SYS_ADMIN`, and unconfined seccomp/apparmor flags.
-- HTTP connection failures: ensure container publishes `-p 5500:5500` and client URL is exactly `http://127.0.0.1:5500/debug` unless you changed the path.
+- HTTP connection failures: ensure container publishes `-p 5500:5500` and client URL is exactly `http://127.0.0.1:5500/mcp` unless you changed the path.
 
 ## Develop
 
@@ -532,16 +532,24 @@ Image contents (high level):
 pwnomcp/
 ├── __init__.py
 ├── __main__.py
-├── server.py          # FastMCP server implementation
+├── server.py          # FastMCP app factory + registration
+├── runtime.py         # HTTP/stdio runtime entrypoints
+├── services.py        # Shared runtime service container
+├── lifespan.py        # FastMCP lifespan wiring
+├── asgi.py            # ASGI app export
+├── http/
+│   ├── models.py      # Attach API request/response models
+│   └── attach.py      # Loopback attach API
 ├── gdb/
 │   ├── __init__.py
 │   └── controller.py  # GDB/pygdbmi interface
 ├── state/
 │   ├── __init__.py
-│   └── session.py     # Session state management
+│   ├── session.py     # Session state management
+│   └── registry.py    # Multi-session registry
 └── tools/
-    ├── __init__.py
-    └── pwndbg.py      # MCP tool implementations
+    ├── *.py           # FastMCP tool registrations by domain
+    └── backends/      # Internal helper adapters
 ```
 
 ### Key Design Decisions

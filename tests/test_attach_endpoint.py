@@ -1,7 +1,9 @@
+import threading
+
 import pytest
 
-from pwnomcp.router import attach as attach_router
-from pwnomcp.router import mcp as mcp_router
+from pwnomcp.http.attach import run_attach_request
+from pwnomcp.http.models import AttachRequest
 
 
 class FakePwndbgTools:
@@ -28,6 +30,14 @@ class FakePwndbgTools:
         return result, []
 
 
+class FakeSession:
+    def __init__(self, session_id: str, tools: FakePwndbgTools):
+        self.session_id = session_id
+        self.tools = tools
+        self.lock = threading.RLock()
+        self.state = type("State", (), {"pid": None})()
+
+
 class FakeRegistry:
     def __init__(self, session=None):
         self.session = session
@@ -39,22 +49,26 @@ class FakeRegistry:
         return self.session
 
 
+class FakeServices:
+    def __init__(self, registry):
+        self.session_registry = registry
+        self.default_session_id = "default"
+
+
 @pytest.mark.asyncio
 async def test_attach_endpoint_runs_pre_and_after():
     tools = FakePwndbgTools(attach_success=True)
-    original = mcp_router.pwndbg_tools
-    mcp_router.pwndbg_tools = tools
-    try:
-        body = attach_router.AttachRequest(
-            pre=["info registers"],
-            pid=1337,
-            after=["bt"],
-            where="target",
-            session_id="chal-a",
-        )
-        response = await attach_router.attach_endpoint(body)
-    finally:
-        mcp_router.pwndbg_tools = original
+    session = FakeSession("chal-a", tools)
+    services = FakeServices(FakeRegistry(session=session))
+
+    body = AttachRequest(
+        pre=["info registers"],
+        pid=1337,
+        after=["bt"],
+        where="target",
+        session_id="chal-a",
+    )
+    response = await run_attach_request(body, services)
 
     assert response.successful is True
     assert response.attach is not None
@@ -73,18 +87,16 @@ async def test_attach_endpoint_runs_pre_and_after():
 @pytest.mark.asyncio
 async def test_attach_endpoint_skips_after_when_attach_fails():
     tools = FakePwndbgTools(attach_success=False)
-    original = mcp_router.pwndbg_tools
-    mcp_router.pwndbg_tools = tools
-    try:
-        body = attach_router.AttachRequest(
-            pre=["info registers"],
-            pid=9001,
-            after=["should_not_run"],
-            session_id="chal-a",
-        )
-        response = await attach_router.attach_endpoint(body)
-    finally:
-        mcp_router.pwndbg_tools = original
+    session = FakeSession("chal-a", tools)
+    services = FakeServices(FakeRegistry(session=session))
+
+    body = AttachRequest(
+        pre=["info registers"],
+        pid=9001,
+        after=["should_not_run"],
+        session_id="chal-a",
+    )
+    response = await run_attach_request(body, services)
 
     assert response.successful is False
     assert "should_not_run" not in response.result
@@ -92,15 +104,10 @@ async def test_attach_endpoint_skips_after_when_attach_fails():
 
 @pytest.mark.asyncio
 async def test_attach_endpoint_errors_on_missing_session_mapping():
-    original_registry = mcp_router.session_registry
+    services = FakeServices(FakeRegistry(session=None))
 
-    mcp_router.session_registry = FakeRegistry(session=None)
-
-    try:
-        body = attach_router.AttachRequest(pid=1337, session_id="missing")
-        response = await attach_router.attach_endpoint(body)
-    finally:
-        mcp_router.session_registry = original_registry
+    body = AttachRequest(pid=1337, session_id="missing")
+    response = await run_attach_request(body, services)
 
     assert response.successful is False
     assert response.attach is not None

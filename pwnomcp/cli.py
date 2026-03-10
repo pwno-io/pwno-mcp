@@ -12,7 +12,7 @@ from typing import Iterable, List, Optional
 
 import requests
 
-from pwnomcp.router.attach import AttachRequest, AttachResponse
+from pwnomcp.http.models import AttachRequest, AttachResponse
 
 DEFAULT_ATTACH_BASE_URL = "http://127.0.0.1:5501"
 
@@ -39,7 +39,7 @@ def attach(
     Attach to an existing process via the local pwno-mcp attach server.
 
     This is a thin client over the FastAPI /attach endpoint implemented in
-    pwnomcp.router.attach. It uses the original AttachRequest/AttachResponse
+    pwnomcp.http.attach. It uses the original AttachRequest/AttachResponse
     models to ensure compatibility.
 
     Args:
