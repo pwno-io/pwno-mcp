@@ -19,7 +19,12 @@ def register(mcp: FastMCP) -> None:
         context_type: str = "all",
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Get the current debugging context."""
+        """Get the current debugging context.
+
+        Args:
+            context_type: "all" for a quick MI snapshot, or one of {regs, stack, disasm,
+                code, backtrace} to request a specific pwndbg context.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -39,7 +44,14 @@ def register(mcp: FastMCP) -> None:
         format: str = "hex",
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Read memory at the specified address."""
+        """Read memory at the specified address.
+
+        Args:
+            address: Start address expression (e.g., "$rsp", "0xdeadbeef").
+            size: Number of bytes to read.
+            format: "hex" for raw bytes (fast path), "string" for x/s, otherwise MI grid
+                format.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False

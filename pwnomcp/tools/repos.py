@@ -20,8 +20,13 @@ def register(mcp: FastMCP) -> None:
     ) -> str:
         """Fetch a git repository into /workspace.
 
-        `target_dir`, when provided, must be inside the container under
-        /workspace; relative paths resolve under /workspace.
+        Args:
+            repo_url: Repository URL (https or ssh).
+            version: Branch/tag/commit to checkout (None = default branch).
+            target_dir: Optional specific directory; defaults to a name derived from
+                the URL. When provided, it must be inside the container under
+                /workspace; relative paths resolve under /workspace.
+            shallow: Whether to clone shallowly.
         """
         services = get_services(ctx)
         tools = services.git_tools

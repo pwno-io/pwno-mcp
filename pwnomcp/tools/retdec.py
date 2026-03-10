@@ -19,7 +19,7 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def get_decompiled_code(ctx: Context = CurrentContext()) -> str:
-        """Return RetDec decompiled C code if available."""
+        """Return RetDec decompiled C code if available, or a status describing why not."""
         services = get_services(ctx)
         analyzer = services.retdec_analyzer
         if not analyzer._initialized:

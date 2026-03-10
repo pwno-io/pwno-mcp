@@ -30,10 +30,38 @@ def register(mcp: FastMCP) -> None:
         binary_path: Optional[str] = None,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Run a transient pwncli exploit driver from inline script content.
+        """Run a pwncli exploit script for a specific debug session.
 
-        This stores code in session runtime state; only create persistent /workspace scripts when the user explicitly requests it.
-        `binary_path` should use a container-visible path under /workspace.
+        Behavior:
+        - Writes the provided script content to a per-session runtime directory
+        - Launches: uv run <session-script> debug <resolved binary> <argument>
+        - Maintains one PwnPipe per debug session
+        - Detects a single-line marker printed by pwncli after attach:
+          "PWNCLI_ATTACH_RESULT:{...json...}" and exposes it as attachment.result
+        - Waits up to wait_timeout seconds for attach/output/exit before returning
+        - Stores inline script content in session runtime state; only create persistent
+          /workspace scripts when the user explicitly requests it
+
+        Args:
+            file: Full contents of a pwncli-style Python script.
+            argument: Additional pwncli arguments after "debug <binary>".
+            wait_timeout: Max time (seconds) to wait for initial attach/output/exit signal.
+            binary_path: Optional target binary path (resolved under /workspace). Use a
+                container-visible path under /workspace; relative paths resolve under
+                /workspace.
+            session_id: Debug session id.
+
+        Returns:
+            {
+              "io": {
+                "pipeinput": bool,    # whether stdin is available
+                "pipeoutput": bool,   # whether output collection succeeded for this call
+                "current_output": str # any currently buffered output consumed by this call
+              },
+              "attachment": {
+                "result": dict | None # parsed attach result from the marker if present
+              }
+            }
         """
         services = get_services(ctx)
         session = resolve_debug_session(
@@ -108,7 +136,18 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Send raw input to a session-scoped pwncli process stdin."""
+        """Send raw input to a session-scoped pwncli process stdin.
+
+        Important:
+            This call does not append a newline. If the target expects a line, include
+            "\n" yourself.
+
+        Args:
+            data: Raw text to write to stdin.
+
+        Returns:
+            { "success": bool } indicating whether the input was written successfully.
+        """
         services = get_services(ctx)
         resolved_session_id, pipe = get_pwnpipe(services, session_id=session_id)
         with services.pwnpipe_lock:
@@ -127,7 +166,13 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Release and return accumulated output from a session PwnPipe."""
+        """Release and return accumulated output from a session PwnPipe.
+
+        Returns:
+            { "success": True, "output": str } on success, or a failure object when no
+            pipe exists. The internal buffer is cleared by this call (subsequent calls only
+            return new output).
+        """
         services = get_services(ctx)
         resolved_session_id, pipe = get_pwnpipe(services, session_id=session_id)
         with services.pwnpipe_lock:
@@ -140,7 +185,11 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Release and return structured events from a session PwnPipe."""
+        """Release and return structured events from a session PwnPipe.
+
+        Returns:
+            {"success": True, "events": [...], "alive": bool, "exit_code": int|None}
+        """
         services = get_services(ctx)
         resolved_session_id, pipe = get_pwnpipe(services, session_id=session_id)
         with services.pwnpipe_lock:

@@ -21,11 +21,15 @@ def register(mcp: FastMCP) -> None:
         timeout: float = 300.0,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Execute an existing Python script in the shared environment.
+        """Execute an existing Python script within the shared environment.
 
-        Use this when a .py file already exists; for one-off snippets, prefer
-        execute_python_code. `script_path` and `cwd` should point inside the
-        container under /workspace.
+        Args:
+            script_path: Path to the script. Use a container-visible path under
+                /workspace; relative paths resolve under /workspace.
+            args: Space-separated args for the script.
+            cwd: Working directory (default /workspace). Use a container-visible path
+                under /workspace; relative paths resolve under /workspace.
+            timeout: Seconds to wait before termination.
         """
         services = get_services(ctx)
         tools = services.python_tools
@@ -49,10 +53,16 @@ def register(mcp: FastMCP) -> None:
         timeout: float = 300.0,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Execute ad-hoc Python code using a temporary runtime script.
+        """Execute Python code dynamically in the shared environment.
+
+        Args:
+            code: Python source code to run.
+            cwd: Working directory (default /workspace). If provided, use a
+                container-visible path under /workspace; relative paths resolve under
+                /workspace.
+            timeout: Seconds to wait before termination.
 
         Prefer this for quick probes and analysis, and only persist files in /workspace when the user explicitly asks.
-        If provided, `cwd` is resolved inside the container under /workspace.
         """
         services = get_services(ctx)
         tools = services.python_tools
@@ -66,7 +76,12 @@ def register(mcp: FastMCP) -> None:
         upgrade: bool = False,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Install additional Python packages using uv."""
+        """Install additional Python packages using the shared package manager (uv).
+
+        Args:
+            packages: Space-separated package list.
+            upgrade: If True, perform upgrades when applicable.
+        """
         services = get_services(ctx)
         tools = services.python_tools
         packages_list = packages.split()

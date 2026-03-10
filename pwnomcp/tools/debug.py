@@ -63,7 +63,14 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Execute an arbitrary GDB/pwndbg command."""
+        """Execute an arbitrary GDB/pwndbg command.
+
+        Args:
+            command: Raw GDB/pwndbg command to execute (e.g., "info registers", "vmmap").
+
+        Returns:
+            Dict containing the raw MI/console responses, a success flag, and the current GDB state.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -83,9 +90,13 @@ def register(mcp: FastMCP) -> None:
     ) -> Dict[str, Any]:
         """Load an executable file into GDB/pwndbg for debugging.
 
-        Use a container-visible path under /workspace (or a relative path, which
-        resolves under /workspace). If your host file is ./workspace/chal, pass
-        /workspace/chal here.
+        Args:
+            binary_path: Absolute path to the ELF to debug. Use the container-visible
+                path under /workspace; relative paths resolve under /workspace. If your
+                host file is ./workspace/chal, pass /workspace/chal here.
+
+        Returns:
+            Dict with MI command responses and state.
         """
         services = get_services(ctx)
         session = resolve_debug_session(
@@ -106,7 +117,15 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-        """Attach to an existing process by PID using GDB/MI."""
+        """Attach to an existing process by PID using GDB/MI.
+
+        Args:
+            pid: Target process ID to attach to.
+
+        Returns:
+            (result, context) where result is the MI attach result and context is a list of
+            quick context snapshots (e.g., backtrace/heap) captured immediately after attach.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -125,7 +144,15 @@ def register(mcp: FastMCP) -> None:
         start: bool = False,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Run the loaded program under GDB control."""
+        """Run the loaded program under GDB control.
+
+        Args:
+            args: Argument string passed to the inferior.
+            start: If True, stop at the program entry (equivalent to --start).
+
+        Returns:
+            MI run/continue results and state.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -143,7 +170,14 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Execute a stepping command (c, n, s, ni, si)."""
+        """Execute a stepping command (c, n, s, ni, si).
+
+        Args:
+            command: One of {c, n, s, ni, si} or their long forms.
+
+        Returns:
+            Dict with MI responses and state.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -161,7 +195,11 @@ def register(mcp: FastMCP) -> None:
         timeout: float = 0.0,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Drain pending async GDB notifications."""
+        """Drain pending async GDB notifications.
+
+        Args:
+            timeout: Maximum time to wait (seconds) for the first event.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -179,7 +217,11 @@ def register(mcp: FastMCP) -> None:
         timeout: float = 1.0,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Interrupt the inferior and drain async notifications."""
+        """Interrupt the inferior and drain async notifications.
+
+        Args:
+            timeout: Maximum time to wait (seconds) for stop notifications.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -212,7 +254,11 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Resume execution at a specified location (MI -exec-jump)."""
+        """Resume execution at a specified location (MI -exec-jump).
+
+        Args:
+            locspec: Location such as a symbol name, file:line, or address (*0x... ).
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -262,7 +308,12 @@ def register(mcp: FastMCP) -> None:
         condition: Optional[str] = None,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Set a breakpoint using MI (-break-insert)."""
+        """Set a breakpoint using MI (-break-insert).
+
+        Args:
+            location: Breakpoint location (symbol/address/file:line).
+            condition: Optional breakpoint condition expression.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
@@ -279,7 +330,7 @@ def register(mcp: FastMCP) -> None:
         session_id: str,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Return current session info without issuing new GDB commands."""
+        """Return current session info (session state + GDB state) without issuing new GDB commands."""
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False
