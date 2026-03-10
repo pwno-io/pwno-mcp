@@ -5,9 +5,13 @@ from dataclasses import dataclass, field
 from typing import Dict
 
 from pwnomcp.pwnpipe import PwnPipe
-from pwnomcp.retdec.retdec import RetDecAnalyzer
 from pwnomcp.state import DebugSessionRegistry
-from pwnomcp.tools.backends import GitTools, PythonTools, SubprocessTools
+from pwnomcp.tools.backends import (
+    GitTools,
+    PythonTools,
+    RetDecAnalyzer,
+    SubprocessTools,
+)
 from pwnomcp.utils.paths import DEFAULT_WORKSPACE, RuntimePaths, build_runtime_paths
 
 logger = logging.getLogger(__name__)

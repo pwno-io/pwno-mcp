@@ -542,16 +542,13 @@ pwnomcp/
 ├── http/
 │   ├── models.py      # Attach API request/response models
 │   └── attach.py      # Loopback attach API
-├── gdb/
-│   ├── __init__.py
-│   └── controller.py  # GDB/pygdbmi interface
 ├── state/
 │   ├── __init__.py
 │   ├── session.py     # Session state management
 │   └── registry.py    # Multi-session registry
 └── tools/
     ├── *.py           # FastMCP tool registrations by domain
-    └── backends/      # Internal helper adapters
+    └── backends/      # Internal adapters (GDB, RetDec, subprocess, git, python)
 ```
 
 ### Key Design Decisions
