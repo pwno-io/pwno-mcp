@@ -30,7 +30,10 @@ def register(mcp: FastMCP) -> None:
         binary_path: Optional[str] = None,
         ctx: Context = CurrentContext(),
     ) -> Dict[str, Any]:
-        """Run a pwncli exploit script for a specific debug session."""
+        """Run a transient pwncli exploit driver from inline script content.
+
+        This stores code in session runtime state; only create persistent /workspace scripts when the user explicitly requests it.
+        """
         services = get_services(ctx)
         session = resolve_debug_session(
             services, session_id=session_id, create_if_missing=False

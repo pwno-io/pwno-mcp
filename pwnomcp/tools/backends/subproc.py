@@ -39,12 +39,15 @@ class SubprocessTools:
         timeout: Optional[float] = 30.0,
     ) -> Dict[str, Any]:
         """
-        Execute a command and wait for it to complete
+        Execute a command and wait for it to complete.
 
         This is primarily intended for compilation commands like:
         - gcc -g -fsanitize=address program.c -o program
         - clang -O0 -g -fno-omit-frame-pointer vuln.c
         - make clean && make
+
+        For Python execution, prefer python_env tools (execute_code / execute_script)
+        so callers use the managed shared Python environment.
 
         Args:
             command: Command to execute (will be shell-parsed)

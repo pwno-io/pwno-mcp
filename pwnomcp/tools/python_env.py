@@ -21,7 +21,11 @@ def register(mcp: FastMCP) -> None:
         timeout: float = 300.0,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Execute an existing Python script within the shared environment."""
+        """Execute an existing Python script in the shared environment.
+
+        Use this when a .py file already exists; for one-off snippets,
+        prefer execute_python_code.
+        """
         services = get_services(ctx)
         tools = services.python_tools
         resolved_script_path = resolve_workspace_path(
@@ -44,7 +48,10 @@ def register(mcp: FastMCP) -> None:
         timeout: float = 300.0,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Execute Python code dynamically in the shared environment."""
+        """Execute ad-hoc Python code using a temporary runtime script.
+
+        Prefer this for quick probes and analysis, and only persist files in /workspace when the user explicitly asks.
+        """
         services = get_services(ctx)
         tools = services.python_tools
         cwd = resolve_workspace_cwd(cwd, workspace_root=DEFAULT_WORKSPACE)

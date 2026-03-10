@@ -88,7 +88,7 @@ class PythonTools:
         timeout: float = 300.0,
     ) -> Dict[str, Any]:
         """
-        Execute a Python script in the shared venv.
+        Execute an existing Python script in the shared venv.
 
         :param script_path: Path to the Python script to execute
         :param args: Arguments to pass to the script
@@ -140,7 +140,7 @@ class PythonTools:
         self, code: str, cwd: Optional[str] = None, timeout: float = 300.0
     ) -> Dict[str, Any]:
         """
-        Execute Python code directly.
+        Execute ad-hoc Python code using a temporary runtime script.
 
         :param code: Python code to execute
         :param cwd: Working directory for execution

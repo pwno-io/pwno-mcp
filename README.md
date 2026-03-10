@@ -433,6 +433,31 @@ Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
 
 Most debugger tools (`set_file`, `run`, `attach`, `get_context`, etc.) require explicit `session_id` selectors.
 
+Python execution guide:
+
+- Use `execute_python_code` for ad-hoc snippets, quick probes, and one-off analysis.
+- Use `execute_python_script` only when a `.py` file already exists.
+- Use `pwncli` for transient exploit-driver runs tied to a debug session.
+- Create persistent `/workspace/*.py` files only when you explicitly want a reusable artifact.
+
+`execute_python_code` runs inline Python in the managed environment without requiring a pre-existing script file.
+
+```json
+{"tool":"execute_python_code","arguments":{"code":"print('hello from inline python')","cwd":"/workspace","timeout":120.0}}
+```
+
+`execute_python_script` runs an existing script path in the managed environment.
+
+```json
+{"tool":"execute_python_script","arguments":{"script_path":"/workspace/solve.py","args":"--remote","cwd":"/workspace","timeout":300.0}}
+```
+
+`pwncli` runs an inline exploit script for a specific debug session and returns interactive startup output.
+
+```json
+{"tool":"pwncli","arguments":{"session_id":"chal-a","binary_path":"/workspace/chal","file":"from pwn import *\nprint('ready')\n"}}
+```
+
 `run_command` executes shell commands (compile/build helpers) in `/workspace` by default.
 
 ```json

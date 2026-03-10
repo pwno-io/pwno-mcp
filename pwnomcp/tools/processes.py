@@ -16,7 +16,11 @@ def register(mcp: FastMCP) -> None:
         timeout: float = 30.0,
         ctx: Context = CurrentContext(),
     ) -> str:
-        """Execute a system command and wait for completion."""
+        """Execute non-Python shell commands and wait for completion.
+
+        Best for compile/build/helper commands; for Python snippets or .py files,
+        prefer execute_python_code or execute_python_script.
+        """
         services = get_services(ctx)
         tools = services.subprocess_tools
         cwd = resolve_workspace_cwd(cwd, workspace_root=DEFAULT_WORKSPACE)
