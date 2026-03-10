@@ -10,9 +10,8 @@ import threading
 import uuid
 from typing import Dict, List, Optional, Any
 
-from pwnomcp.gdb import GdbController
+from pwnomcp.tools.backends import GdbController, PwndbgTools
 from pwnomcp.state.session import SessionState
-from pwnomcp.tools import PwndbgTools
 from pwnomcp.utils.paths import RuntimePaths, sanitize_session_id
 
 logger = logging.getLogger(__name__)

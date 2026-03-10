@@ -37,13 +37,13 @@ spec:
         - containerPort: 5500
         readinessProbe:
           httpGet:
-            path: /mcp
+            path: /healthz
             port: 5500
           initialDelaySeconds: 5
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /mcp
+            path: /healthz
             port: 5500
           initialDelaySeconds: 10
           periodSeconds: 20

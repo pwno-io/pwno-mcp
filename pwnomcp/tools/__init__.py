@@ -1,8 +1,18 @@
-"""MCP tools for Pwno debugging"""
+"""FastMCP tool registration package."""
 
-from .pwndbg import PwndbgTools
-from .subproc import SubprocessTools
-from .git import GitTools
-from .python import PythonTools
+from fastmcp import FastMCP
 
-__all__ = ["PwndbgTools", "SubprocessTools", "GitTools", "PythonTools"]
+
+def register_all_tools(mcp: FastMCP) -> None:
+    from . import debug, inspect, processes, pwncli, python_env, repos, retdec
+
+    debug.register(mcp)
+    inspect.register(mcp)
+    processes.register(mcp)
+    repos.register(mcp)
+    python_env.register(mcp)
+    pwncli.register(mcp)
+    retdec.register(mcp)
+
+
+__all__ = ["register_all_tools"]

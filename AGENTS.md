@@ -6,7 +6,7 @@ Guide for agentic coding tools working in this repository.
 - Language: Python (requires 3.12+; see `pyproject.toml`).
 - Packaging: `pyproject.toml` + `uv.lock` (uv is used in Docker).
 - Entry point: `python -m pwnomcp` (see `pwnomcp/__main__.py`).
-- Runtime modes: Streamable HTTP (default) and stdio (`--stdio`).
+- Runtime modes: HTTP (default path `/mcp`) and stdio (`--stdio`).
 - Docker-first workflow is supported (see `Dockerfile`, `docker-compose.yml`).
 
 ## Setup (local dev)

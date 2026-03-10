@@ -4,7 +4,7 @@ Entry point for Pwno MCP server
 
 import argparse
 
-from pwnomcp.server import run_server, run_stdio
+from pwnomcp.runtime import run_http, run_stdio
 
 
 def _parse_args() -> argparse.Namespace:
@@ -32,14 +32,14 @@ def _parse_args() -> argparse.Namespace:
         help="Port for the attach API server (default: 5501)",
     )
     parser.add_argument(
-        "--streamable-http-path",
-        default="/debug",
-        help="URL path for the Streamable HTTP transport (default: /debug)",
+        "--http-path",
+        default="/mcp",
+        help="URL path for the HTTP transport (default: /mcp)",
     )
     parser.add_argument(
         "--stdio",
         action="store_true",
-        help="Run using stdio transport (default is Streamable HTTP)",
+        help="Run using stdio transport (default is HTTP)",
     )
     return parser.parse_args()
 
@@ -49,10 +49,10 @@ if __name__ == "__main__":
     if cli_args.stdio:
         run_stdio()
     else:
-        run_server(
+        run_http(
             host=cli_args.host,
             port=cli_args.port,
             attach_host=cli_args.attach_host,
             attach_port=cli_args.attach_port,
-            streamable_http_path=cli_args.streamable_http_path,
+            http_path=cli_args.http_path,
         )
