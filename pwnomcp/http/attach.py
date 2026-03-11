@@ -101,9 +101,9 @@ async def run_attach_request(
 
         return attach_success, attach_info, command_results
 
-    def _run_with_session_lock() -> (
-        Tuple[bool, Optional[Dict[str, Any]], Dict[str, Any]]
-    ):
+    def _run_with_session_lock() -> Tuple[
+        bool, Optional[Dict[str, Any]], Dict[str, Any]
+    ]:
         with session.lock:
             return _run_attach_sequence()
 
@@ -119,7 +119,7 @@ async def run_attach_request(
 
 
 def create_attach_app(services: AppServices) -> FastAPI:
-    app = FastAPI(title="pwno-mcp attach", version="0.1.0")
+    app = FastAPI(title="pwno-mcp attach", version="0.2.0")
 
     @app.get("/")
     async def root():
