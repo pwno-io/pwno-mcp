@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "maple",
+  "theme": "mint",
   "name": "pwno-mcp",
   "description": "Stateful MCP server for autonomous pwn and binary research with GDB, pwndbg, and session-aware tooling.",
   "colors": {
@@ -11,15 +11,14 @@
   "logo": {
     "light": "/images/logo-light.svg",
     "dark": "/images/logo-dark.svg",
-    "href": "https://github.com/pwno-io/pwno-mcp"
+    "href": "https://docs.pwno.io"
   },
   "favicon": "/images/logo-light.svg",
   "navigation": {
-    "dropdowns": [
+    "tabs": [
       {
-        "dropdown": "Get Started",
+        "tab": "Get Started",
         "icon": "rocket",
-        "description": "Install, run, and connect pwno-mcp.",
         "groups": [
           {
             "group": "Overview",
@@ -42,9 +41,8 @@
         ]
       },
       {
-        "dropdown": "Tool Reference",
+        "tab": "Tool Reference",
         "icon": "terminal",
-        "description": "Debugger, process, Python, and exploit workflow tools.",
         "groups": [
           {
             "group": "Core Tools",
@@ -60,9 +58,8 @@
         ]
       },
       {
-        "dropdown": "Project",
+        "tab": "Project",
         "icon": "book-open",
-        "description": "Development notes, structure, and project policies.",
         "groups": [
           {
             "group": "Maintainers",
