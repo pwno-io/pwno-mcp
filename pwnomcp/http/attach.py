@@ -101,9 +101,9 @@ async def run_attach_request(
 
         return attach_success, attach_info, command_results
 
-    def _run_with_session_lock() -> Tuple[
-        bool, Optional[Dict[str, Any]], Dict[str, Any]
-    ]:
+    def _run_with_session_lock() -> (
+        Tuple[bool, Optional[Dict[str, Any]], Dict[str, Any]]
+    ):
         with session.lock:
             return _run_attach_sequence()
 
