@@ -1,0 +1,41 @@
+---
+title: "Claude Code"
+description: "Connect pwno-mcp to Claude Code over HTTP or stdio."
+---
+
+# Claude Code
+
+Claude Code supports both remote HTTP MCP servers and local stdio MCP servers.
+
+## Option 1: HTTP
+
+Start `pwno-mcp` in HTTP mode, then add the server from your project root.
+
+```bash
+claude mcp add --transport http --scope project pwno-mcp http://127.0.0.1:5500/mcp
+```
+
+After that, run `/mcp` in Claude Code to confirm the server is connected.
+
+## Option 2: stdio
+
+This stores a project-scoped `.mcp.json` and has Claude Code spawn Docker directly.
+
+```bash
+claude mcp add --transport stdio --scope project pwno-mcp -- \
+  docker run --rm -i \
+    --cap-add=SYS_PTRACE \
+    --cap-add=SYS_ADMIN \
+    --security-opt seccomp=unconfined \
+    --security-opt apparmor=unconfined \
+    -v "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace" \
+    ghcr.io/pwno-io/pwno-mcp:latest \
+    --stdio
+```
+
+## Helpful commands
+
+```bash
+claude mcp list
+claude mcp get pwno-mcp
+```

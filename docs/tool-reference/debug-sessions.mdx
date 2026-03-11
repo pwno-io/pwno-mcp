@@ -1,0 +1,60 @@
+---
+title: "Debug Sessions"
+description: "Session lifecycle, file loading, breakpoints, and execution control tools."
+---
+
+# Debug Sessions
+
+Most debugger operations are scoped by `session_id`. Create a session first, then load a binary or attach to a running process.
+
+## Session lifecycle
+
+- `create_debug_session` creates or returns a session.
+- `list_debug_sessions` lists active sessions.
+- `close_debug_session` shuts down a session and any attached `pwncli` driver.
+- `get_session_info` returns session state plus cached debugger state without issuing new GDB commands.
+
+```json
+{"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
+{"tool":"list_debug_sessions","arguments":{}}
+{"tool":"get_session_info","arguments":{"session_id":"chal-a"}}
+```
+
+## Load or attach
+
+- `set_file` loads an executable into GDB.
+- `attach` attaches to an existing PID and returns both the attach result and quick context snapshots.
+
+```json
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal","session_id":"chal-a"}}
+{"tool":"attach","arguments":{"pid":31337,"session_id":"chal-a"}}
+```
+
+## Breakpoints and raw commands
+
+- `set_breakpoint` accepts a symbol, address, or `file:line` plus an optional condition.
+- `execute` runs raw GDB or pwndbg commands when you need something lower level.
+
+```json
+{"tool":"set_breakpoint","arguments":{"location":"main","condition":"$rax == 0","session_id":"chal-a"}}
+{"tool":"execute","arguments":{"command":"info registers","session_id":"chal-a"}}
+```
+
+## Execution control
+
+- `run` starts the inferior and accepts `args` and `start`.
+- `step_control` supports `c`, `n`, `s`, `ni`, and `si`.
+- `gdb_poll` drains pending async notifications.
+- `gdb_interrupt` interrupts the inferior and waits for stop events.
+- `finish`, `jump`, `return_from_function`, and `until` wrap common MI execution helpers.
+
+```json
+{"tool":"run","arguments":{"args":"--demo","start":true,"session_id":"chal-a"}}
+{"tool":"step_control","arguments":{"command":"ni","session_id":"chal-a"}}
+{"tool":"gdb_interrupt","arguments":{"timeout":1.0,"session_id":"chal-a"}}
+{"tool":"until","arguments":{"locspec":"main","session_id":"chal-a"}}
+```
+
+## Path guidance
+
+Use container-visible paths under `/workspace` when setting files. Relative paths are resolved under `/workspace` by the server.

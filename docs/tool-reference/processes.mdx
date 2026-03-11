@@ -1,0 +1,34 @@
+---
+title: "Processes"
+description: "Run helper commands and manage tracked background processes."
+---
+
+# Processes
+
+These tools are for helper services, build steps, and supporting automation. They are not for running the target binary under debugger control.
+
+## Synchronous commands
+
+`run_command` executes a shell command and waits for completion.
+
+- Default working directory is `/workspace`.
+- Use this for compile and helper steps.
+- Do not use it to run the target binary under analysis.
+
+```json
+{"tool":"run_command","arguments":{"command":"gcc -g vuln.c -o chal","cwd":"/workspace","timeout":30.0}}
+```
+
+## Background helpers
+
+- `spawn_process` starts a tracked long-running process and returns metadata.
+- `get_process` reads a tracked process status.
+- `kill_process` sends a signal to a tracked process.
+- `list_processes` lists all tracked background helpers.
+
+```json
+{"tool":"spawn_process","arguments":{"command":"python3 -m http.server 8000","cwd":"/workspace"}}
+{"tool":"get_process","arguments":{"pid":12345}}
+{"tool":"kill_process","arguments":{"pid":12345,"signal":15}}
+{"tool":"list_processes","arguments":{}}
+```

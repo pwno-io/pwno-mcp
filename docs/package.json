@@ -1,0 +1,8 @@
+{
+  "name": "pwno-mcp-docs",
+  "private": true,
+  "scripts": {
+    "dev": "npx mint dev",
+    "update": "npx mint update"
+  }
+}

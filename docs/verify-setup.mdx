@@ -1,0 +1,29 @@
+---
+title: "Verify Setup"
+description: "Run a fast end-to-end check against a local pwno-mcp instance."
+---
+
+# Verify Setup
+
+Most users can skip this page, but it is useful when you are troubleshooting a fresh MCP connection.
+
+## Prompt to give your agent
+
+```text
+Use pwno-mcp to load /workspace/chal, set a breakpoint at main, run the program, show full context, then step once.
+```
+
+If you followed Quick Start, the host path is `./workspace/chal` and the in-container tool path is `/workspace/chal`.
+
+## Manual tool sequence
+
+```json
+{"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal","session_id":"chal-a"}}
+{"tool":"set_breakpoint","arguments":{"location":"main","session_id":"chal-a"}}
+{"tool":"run","arguments":{"args":"","start":false,"session_id":"chal-a"}}
+{"tool":"get_context","arguments":{"context_type":"all","session_id":"chal-a"}}
+{"tool":"step_control","arguments":{"command":"n","session_id":"chal-a"}}
+```
+
+Common stepping commands are `c`, `n`, `s`, `ni`, and `si`.

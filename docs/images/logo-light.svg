@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+  <title id="title">pwno-mcp</title>
+  <desc id="desc">Light logo for pwno-mcp docs</desc>
+  <rect width="320" height="96" rx="20" fill="#fff7ed"/>
+  <rect x="8" y="8" width="304" height="80" rx="16" fill="#111827"/>
+  <text x="24" y="58" font-family="monospace" font-size="34" font-weight="700" fill="#fb923c">pwno-mcp</text>
+  <circle cx="275" cy="48" r="12" fill="#fb923c"/>
+</svg>

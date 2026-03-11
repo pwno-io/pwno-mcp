@@ -1,0 +1,37 @@
+---
+title: "Python"
+description: "Run inline Python, execute scripts, and manage packages in the shared environment."
+---
+
+# Python
+
+The server exposes a managed Python environment for quick analysis and scripting.
+
+## Ad-hoc code
+
+Use `execute_python_code` for one-off probes and analysis.
+
+- Prefer this over `python -c` in `run_command`.
+- Only persist files in `/workspace` when you intentionally want a reusable artifact.
+
+```json
+{"tool":"execute_python_code","arguments":{"code":"print('hello from inline python')","cwd":"/workspace","timeout":120.0}}
+```
+
+## Existing scripts
+
+Use `execute_python_script` only when a `.py` file already exists.
+
+```json
+{"tool":"execute_python_script","arguments":{"script_path":"/workspace/solve.py","args":"--remote","cwd":"/workspace","timeout":300.0}}
+```
+
+## Package management
+
+- `install_python_packages` installs extra packages with `uv`.
+- `list_python_packages` lists what is already available.
+
+```json
+{"tool":"install_python_packages","arguments":{"packages":"z3-solver capstone","upgrade":false}}
+{"tool":"list_python_packages","arguments":{}}
+```

@@ -1,0 +1,66 @@
+---
+title: "Quick Start"
+description: "Run pwno-mcp locally with Docker and connect an MCP client."
+---
+
+# Quick Start
+
+Create a local `workspace` directory, place your target binary there, then launch `pwno-mcp` and connect your MCP client.
+
+## Prepare the workspace
+
+```bash
+mkdir -p ./workspace
+cp ./path/to/your/binary ./workspace/chal
+chmod +x ./workspace/chal
+```
+
+Use **HTTP** when your client expects a `url`. Use **stdio** when your client expects `command` + `args`.
+
+## HTTP mode
+
+```bash
+docker run --rm -p 5500:5500 \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  -v "$PWD/workspace:/workspace" \
+  ghcr.io/pwno-io/pwno-mcp:latest
+```
+
+Connect clients to:
+
+```text
+http://127.0.0.1:5500/mcp
+```
+
+## stdio mode
+
+```bash
+docker run --rm -i \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  -v "$PWD/workspace:/workspace" \
+  ghcr.io/pwno-io/pwno-mcp:latest \
+  --stdio
+```
+
+## Important defaults
+
+- `http_path` defaults to `/mcp`.
+- The HTTP health endpoint is `/healthz`.
+- The attach helper API defaults to `127.0.0.1:5501` inside the runtime.
+- Tool path arguments should use container-visible paths under `/workspace`.
+
+## Next step
+
+Pick your client configuration:
+
+- [Claude Desktop](/client-setup/claude-desktop)
+- [Claude Code](/client-setup/claude-code)
+- [Cursor](/client-setup/cursor)
+- [OpenCode](/client-setup/opencode)
+- [Codex CLI](/client-setup/codex-cli)

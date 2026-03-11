@@ -1,0 +1,46 @@
+---
+title: "Architecture"
+description: "Project structure and key design decisions behind pwno-mcp."
+---
+
+# Architecture
+
+## Project structure
+
+```text
+pwnomcp/
+├── __init__.py
+├── __main__.py
+├── server.py
+├── runtime.py
+├── services.py
+├── lifespan.py
+├── asgi.py
+├── http/
+│   ├── models.py
+│   └── attach.py
+├── state/
+│   ├── session.py
+│   └── registry.py
+└── tools/
+    ├── *.py
+    └── backends/
+```
+
+## Key ideas
+
+### Synchronous tool execution
+
+Each MCP tool invocation returns a complete result suitable for agent workflows, instead of relying on a continuously streaming UI.
+
+### Stateful sessions
+
+The server maintains session state for loaded binaries, breakpoints, command history, runtime directories, and related driver metadata.
+
+### GDB/MI-native control
+
+`pwno-mcp` prefers MI commands such as `-file-exec-and-symbols`, `-break-insert`, `-exec-run`, and `-data-evaluate-expression` so results stay structured and easier for agents to consume reliably.
+
+### Per-container isolation
+
+Each runtime instance keeps its own debugger state and `/workspace` mount, which makes the system fit containerized and remote workflows well.

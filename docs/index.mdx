@@ -1,0 +1,39 @@
+---
+title: "pwno-mcp"
+description: "Stateful debugging for autonomous pwn and binary research over MCP."
+---
+
+# pwno-mcp
+
+`pwno-mcp` runs GDB + pwndbg in an isolated environment and exposes stateful debugging and helper tooling over MCP for agentic coding clients.
+
+## Why it exists
+
+The project is built for LLM-driven binary research workflows where a stateless shell is not enough. It keeps debugger state alive across calls, supports multiple parallel sessions, and pairs low-level debugging with helper tools for process management, Python execution, repo fetching, and exploit-driver flows.
+
+## Highlights
+
+- Stateful GDB + pwndbg sessions exposed over MCP.
+- Deterministic execution control with GDB/MI commands.
+- Fast context snapshots for registers, stack, disassembly, source, and backtraces.
+- Optional `pwncli`-based interactive workflows tied to a debug session.
+- Build, subprocess, Git, Python, and RetDec helpers in the same runtime.
+- HTTP and stdio transports for local and remote MCP clients.
+
+## Start here
+
+1. Use [Quick Start](/quickstart) to launch the server with Docker.
+2. Pick a client setup page under the Client Setup section.
+3. Run the flow in [Verify Setup](/verify-setup) if you want an end-to-end sanity check.
+4. Dive into the [Tool Reference](/tool-reference/debug-sessions) when you are ready to automate.
+
+## Runtime model
+
+- The default HTTP endpoint is `http://127.0.0.1:5500/mcp`.
+- The health endpoint is `http://127.0.0.1:5500/healthz`.
+- Most file paths passed to tools should resolve inside `/workspace`.
+- Multi-session workflows should pass explicit `session_id` values.
+
+## Documentation source
+
+This Mintlify site lives in `docs/` and is a structured version of the repository README. The GitHub `README.md` stays in place for package metadata and repository landing-page use.

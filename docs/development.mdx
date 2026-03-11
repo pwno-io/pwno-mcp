@@ -1,0 +1,48 @@
+---
+title: "Development"
+description: "Local development, Docker build, and CI notes for maintainers."
+---
+
+# Development
+
+This page is for working on `pwno-mcp` itself, not for debugging a target binary.
+
+## Local development
+
+Prerequisites on the host are Python 3.12+, GDB with Python support, and a working pwndbg setup.
+
+```bash
+uv sync
+uv run python -m pwnomcp
+uv run python -m pwnomcp --stdio
+
+# or without uv
+python -m pip install -e ".[dev]"
+python -m pwnomcp
+python -m pwnomcp --stdio
+```
+
+## Docker build
+
+```bash
+docker build -t pwno-mcp:latest . --platform linux/amd64
+```
+
+The published image targets `linux/amd64`. On Apple Silicon, keep the explicit platform flag.
+
+## Docker Compose
+
+```bash
+docker-compose up -d
+docker-compose logs -f
+docker-compose exec pwno-mcp bash
+```
+
+## CI checks
+
+Current GitHub Actions run these verification steps:
+
+- `uv sync --locked --extra dev`
+- `uv run black --check .`
+- `uv run mypy pwnomcp --ignore-missing-imports --disable-error-code=import-untyped`
+- `uv run pytest -v`

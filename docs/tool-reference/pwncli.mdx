@@ -1,0 +1,40 @@
+---
+title: "pwncli Workflows"
+description: "Interactive exploit-driver flows tied to a debug session."
+---
+
+# pwncli Workflows
+
+Use the `pwncli` family when you want an interactive exploit driver that stays attached to a specific debug session.
+
+## Start a driver
+
+`pwncli` writes the provided script into the session runtime directory, launches it with `uv run`, and exposes both startup output and any parsed attach result marker.
+
+```json
+{"tool":"pwncli","arguments":{"session_id":"chal-a","binary_path":"/workspace/chal","file":"from pwn import *\nprint('ready')\n"}}
+```
+
+## Interact with the driver
+
+- `sendinput` writes raw input to the session driver.
+- `checkoutput` returns buffered output and clears that buffer.
+- `checkevents` returns structured events and driver liveness data.
+
+`sendinput` does not append a newline automatically.
+
+```json
+{"tool":"sendinput","arguments":{"session_id":"chal-a","data":"AAAA\n"}}
+{"tool":"checkoutput","arguments":{"session_id":"chal-a"}}
+{"tool":"checkevents","arguments":{"session_id":"chal-a"}}
+```
+
+## Stop or inspect sessions
+
+- `pwncli_stop` kills the driver bound to a session.
+- `list_pwncli_sessions` lists all active driver sessions.
+
+```json
+{"tool":"pwncli_stop","arguments":{"session_id":"chal-a"}}
+{"tool":"list_pwncli_sessions","arguments":{}}
+```

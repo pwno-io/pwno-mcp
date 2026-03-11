@@ -1,0 +1,30 @@
+---
+title: "Repos and RetDec"
+description: "Fetch repositories into the workspace and inspect RetDec decompilation status."
+---
+
+# Repos and RetDec
+
+These tools help populate the workspace and inspect decompilation state.
+
+## Git helper
+
+`fetch_repo` clones a repository into `/workspace`.
+
+- `repo_url` accepts HTTPS or SSH URLs.
+- `version` can be a branch, tag, or commit.
+- `target_dir` must resolve inside `/workspace` when provided.
+
+```json
+{"tool":"fetch_repo","arguments":{"repo_url":"https://github.com/pwno-io/pwno-mcp.git","version":"main","target_dir":"/workspace/pwno-mcp","shallow":true}}
+```
+
+## RetDec helper
+
+- `get_retdec_status` returns the current decompilation state.
+- `get_decompiled_code` returns C output when available or a structured unavailable response.
+
+```json
+{"tool":"get_retdec_status","arguments":{}}
+{"tool":"get_decompiled_code","arguments":{}}
+```

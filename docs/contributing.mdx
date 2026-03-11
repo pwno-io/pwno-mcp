@@ -1,0 +1,23 @@
+---
+title: "Contributing"
+description: "How to contribute to pwno-mcp."
+---
+
+# Contributing
+
+Contributions are welcome.
+
+## Before opening a pull request
+
+1. Sync dependencies with `uv sync --locked --extra dev`.
+2. Run formatting, type checking, and tests.
+3. Keep changes small and focused.
+4. Update `README.md` or `docs/` when behavior changes.
+
+## Validation commands
+
+```bash
+uv run black --check .
+uv run mypy pwnomcp --ignore-missing-imports --disable-error-code=import-untyped
+uv run pytest -v
+```

@@ -1,0 +1,53 @@
+---
+title: "Cursor"
+description: "Configure pwno-mcp for Cursor using HTTP or stdio transport."
+---
+
+# Cursor
+
+Cursor MCP configuration can live in either of these files:
+
+- Project: `.cursor/mcp.json`
+- Global: `~/.cursor/mcp.json`
+
+If you use project config, keep your target binary under `PROJECT_ROOT/workspace/`.
+
+## HTTP example
+
+```json
+{
+  "mcpServers": {
+    "pwno-mcp": {
+      "url": "http://127.0.0.1:5500/mcp"
+    }
+  }
+}
+```
+
+## stdio example
+
+```json
+{
+  "mcpServers": {
+    "pwno-mcp": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_ADMIN",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--security-opt",
+        "apparmor=unconfined",
+        "-v",
+        "${workspaceFolder}/workspace:/workspace",
+        "ghcr.io/pwno-io/pwno-mcp:latest",
+        "--stdio"
+      ]
+    }
+  }
+}
+```

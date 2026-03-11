@@ -1,0 +1,40 @@
+---
+title: "Claude Desktop"
+description: "Configure pwno-mcp for Claude Desktop over stdio."
+---
+
+# Claude Desktop
+
+Claude Desktop uses a local stdio MCP server definition.
+
+## Config file location
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+Use an absolute host path for the workspace mount.
+
+```json
+{
+  "mcpServers": {
+    "pwno-mcp": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_ADMIN",
+        "--security-opt",
+        "seccomp=unconfined",
+        "--security-opt",
+        "apparmor=unconfined",
+        "-v",
+        "/ABSOLUTE/PATH/TO/YOUR/PROJECT/workspace:/workspace",
+        "ghcr.io/pwno-io/pwno-mcp:latest",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
