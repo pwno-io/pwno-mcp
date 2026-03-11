@@ -434,6 +434,14 @@ Common stepping commands: `c`, `n`, `s`, `ni`, `si`.
 
 Most debugger tools (`set_file`, `run`, `attach`, `get_context`, etc.) require explicit `session_id` selectors.
 
+Preferred pwn workflow:
+
+1. Use `set_file` -> `set_breakpoint` -> `run` -> `get_context` / `get_memory` to debug the target.
+2. Use `attach` when the target is already running.
+3. Use `execute_python_code` for quick Python probes. Do not use `python -c` in `run_command`.
+4. Use `pwncli` + `sendinput` / `checkoutput` / `checkevents` for interactive exploit workflows.
+5. Use `run_command` / `spawn_process` only for build steps and helper services.
+
 Python execution guide:
 
 - Use `execute_python_code` for ad-hoc snippets, quick probes, and one-off analysis.
@@ -459,16 +467,16 @@ Python execution guide:
 {"tool":"pwncli","arguments":{"session_id":"chal-a","binary_path":"/workspace/chal","file":"from pwn import *\nprint('ready')\n"}}
 ```
 
-`run_command` executes shell commands (compile/build helpers) in `/workspace` by default.
+`run_command` executes shell commands (compile/build helpers) in `/workspace` by default. Do not use it to run the target binary.
 
 ```json
 {"tool":"run_command","arguments":{"command":"gcc -g vuln.c -o chal","cwd":"/workspace","timeout":30.0}}
 ```
 
-`spawn_process` starts a background process.
+`spawn_process` starts a background process for helper services (for example, a local HTTP server). Do not use it to run the target binary.
 
 ```json
-{"tool":"spawn_process","arguments":{"command":"./chal","cwd":"/workspace"}}
+{"tool":"spawn_process","arguments":{"command":"python3 -m http.server 8000","cwd":"/workspace"}}
 ```
 
 `get_process` checks spawned process status.

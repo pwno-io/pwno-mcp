@@ -19,8 +19,11 @@ def register(mcp: FastMCP) -> None:
         """Execute a system command and wait for completion.
 
         Note:
-            Do not use this to run the target binary under analysis; use the dedicated
-            tools instead.
+            Use this for build and helper commands.
+            Do not use this to run the target binary under analysis.
+            Use set_file + run (or attach) for the target.
+            Use execute_python_code instead of ``python -c``.
+            Use pwncli for interactive exploit-driver workflows.
 
         Args:
             command: Shell command to run.
@@ -46,6 +49,12 @@ def register(mcp: FastMCP) -> None:
         ctx: Context = CurrentContext(),
     ) -> str:
         """Spawn a long-running background process and return its PID and log paths.
+
+        Note:
+            Use this for helper services.
+            Do not use this to run the target binary under analysis.
+            Use set_file + run (or attach) for debugger workflows.
+            Use pwncli for exploit interaction.
 
         Args:
             command: Shell command to spawn.

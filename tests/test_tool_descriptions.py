@@ -27,8 +27,13 @@ async def test_python_execution_tool_guidance_in_descriptions():
     assert "do not use this to run the target binary" in descriptions["run_command"]
     assert "stdout/stderr/exit code" in descriptions["run_command"]
     assert "under /workspace" in descriptions["run_command"]
+    assert "execute_python_code" in descriptions["run_command"]
+    assert "pwncli" in descriptions["run_command"]
+    assert "use this for build and helper commands" in descriptions["run_command"]
 
     assert "under /workspace" in descriptions["spawn_process"]
+    assert "do not use this to run the target binary" in descriptions["spawn_process"]
+    assert "set_file + run" in descriptions["spawn_process"]
     assert "under /workspace" in descriptions["set_file"]
     assert "under /workspace" in descriptions["execute_python_script"]
     assert "under /workspace" in descriptions["fetch_repo"]
