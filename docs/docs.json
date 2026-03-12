@@ -25,14 +25,13 @@
         "groups": [
           {
             "group": "Introduction",
-            "icon": "book-open",
+            "icon": "album",
             "pages": ["index", "quickstart", "verify-setup"]
           },
           {
             "group": "Client Setup",
-            "icon": "plug",
+            "icon": "pizza",
             "pages": [
-              "client-setup/index",
               "client-setup/claude-desktop",
               "client-setup/claude-code",
               "client-setup/cursor",
