@@ -5,16 +5,14 @@ description: "Connect pwno-mcp to Codex CLI over HTTP or stdio."
 
 Codex CLI uses `~/.codex/config.toml` for MCP configuration.
 
-## HTTP example
+<CodeGroup>
 
-```toml
+```toml HTTP
 [mcp_servers.pwno-mcp]
 url = "http://127.0.0.1:5500/mcp"
 ```
 
-## stdio example
-
-```toml
+```toml stdio
 [mcp_servers.pwno-mcp]
 command = "docker"
 args = [
@@ -34,8 +32,14 @@ args = [
 ]
 ```
 
+</CodeGroup>
+
 ## Check configuration
 
 ```bash
 codex mcp list
 ```
+
+<Check>
+  Once `pwno-mcp` appears in `codex mcp list`, you can start issuing normal agent prompts that reference the server by name.
+</Check>

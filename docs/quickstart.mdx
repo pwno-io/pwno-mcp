@@ -3,21 +3,36 @@ title: "Quick Start"
 description: "Run pwno-mcp locally with Docker and connect an MCP client."
 ---
 
-Create a local `workspace` directory, place your target binary there, then launch `pwno-mcp` and connect your MCP client.
+This is the fastest path to a working local `pwno-mcp` instance.
 
-## Prepare the workspace
+<Warning>
+  `pwno-mcp` needs `SYS_PTRACE`, `SYS_ADMIN`, and unconfined seccomp/apparmor settings so GDB and attach flows work correctly inside Docker.
+</Warning>
 
-```bash
-mkdir -p ./workspace
-cp ./path/to/your/binary ./workspace/chal
-chmod +x ./workspace/chal
-```
+<Steps>
+  <Step title="Create a workspace mount">
+    Put the target binary you want to analyze inside a local `workspace` directory.
 
-Use **HTTP** when your client expects a `url`. Use **stdio** when your client expects `command` + `args`.
+    ```bash
+    mkdir -p ./workspace
+    cp ./path/to/your/binary ./workspace/chal
+    chmod +x ./workspace/chal
+    ```
+  </Step>
+  <Step title="Choose a transport">
+    Use HTTP when your client wants a `url`. Use stdio when your client wants a local `command` plus `args`.
+  </Step>
+  <Step title="Start the server">
+    Pick one of the launch commands below.
+  </Step>
+  <Step title="Connect your client">
+    Open [Client Setup](/client-setup/index) and copy the matching config for your MCP client.
+  </Step>
+</Steps>
 
-## HTTP mode
+<CodeGroup>
 
-```bash
+```bash HTTP
 docker run --rm -p 5500:5500 \
   --cap-add=SYS_PTRACE \
   --cap-add=SYS_ADMIN \
@@ -27,15 +42,7 @@ docker run --rm -p 5500:5500 \
   ghcr.io/pwno-io/pwno-mcp:latest
 ```
 
-Connect clients to:
-
-```text
-http://127.0.0.1:5500/mcp
-```
-
-## stdio mode
-
-```bash
+```bash stdio
 docker run --rm -i \
   --cap-add=SYS_PTRACE \
   --cap-add=SYS_ADMIN \
@@ -46,19 +53,31 @@ docker run --rm -i \
   --stdio
 ```
 
+</CodeGroup>
+
+In HTTP mode, connect clients to `http://127.0.0.1:5500/mcp` and use `http://127.0.0.1:5500/healthz` for health checks.
+
+In stdio mode, your client spawns the container as a local MCP server instead of calling an HTTP endpoint.
+
 ## Important defaults
 
 - `http_path` defaults to `/mcp`.
 - The HTTP health endpoint is `/healthz`.
 - The attach helper API defaults to `127.0.0.1:5501` inside the runtime.
 - Tool path arguments should use container-visible paths under `/workspace`.
+- Relative paths are resolved under `/workspace` by the server.
 
-## Next step
+<Check>
+  If you mounted `./workspace` from your host, your first binary path inside tool calls is usually `/workspace/chal`.
+</Check>
 
-Pick your client configuration:
+## Next steps
 
-- [Claude Desktop](/client-setup/claude-desktop)
-- [Claude Code](/client-setup/claude-code)
-- [Cursor](/client-setup/cursor)
-- [OpenCode](/client-setup/opencode)
-- [Codex CLI](/client-setup/codex-cli)
+<CardGroup cols={2}>
+  <Card title="Configure your client" icon="plug" href="/client-setup/index">
+    Copy a ready-to-use HTTP or stdio config for your MCP client.
+  </Card>
+  <Card title="Verify the setup" icon="check-circle" href="/verify-setup">
+    Run a short end-to-end validation flow against your local server.
+  </Card>
+</CardGroup>

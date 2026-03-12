@@ -1,0 +1,70 @@
+---
+title: "Workspace Paths"
+description: "How pwno-mcp resolves file paths, working directories, and runtime artifacts."
+---
+
+`pwno-mcp` is designed around a container-visible workspace rooted at `/workspace`.
+
+## The core rule
+
+Pass file paths that resolve inside `/workspace`.
+
+<Tabs>
+  <Tab title="Good paths">
+    - `/workspace/chal`
+    - `/workspace/build/vuln`
+    - `chal`
+    - `build/vuln`
+  </Tab>
+  <Tab title="Bad paths">
+    - `/tmp/chal`
+    - `/home/you/chal`
+    - `/Users/name/project/chal`
+    - any host path that is not mounted into the container
+  </Tab>
+</Tabs>
+
+## Relative path behavior
+
+When a tool accepts a path or `cwd`, relative values are resolved under `/workspace`.
+
+```json
+{"tool":"set_file","arguments":{"binary_path":"chal","session_id":"chal-a"}}
+{"tool":"run_command","arguments":{"command":"make","cwd":"build"}}
+```
+
+These resolve to `/workspace/chal` and `/workspace/build` inside the server runtime.
+
+## Host path mapping
+
+If your Docker mount is:
+
+```text
+$PWD/workspace:/workspace
+```
+
+then a host file like `./workspace/chal` becomes `/workspace/chal` in tool calls.
+
+<Warning>
+  Tools cannot see arbitrary host filesystem paths. If a file is not inside the mounted workspace, it is not available to the server.
+</Warning>
+
+## Runtime artifacts vs workspace files
+
+Not everything lives in `/workspace`.
+
+- user-visible targets, source files, helper scripts, and cloned repos live in `/workspace`
+- server-managed runtime artifacts live under `PWNO_RUNTIME_ROOT`
+- session runtime directories are created under that runtime root, not under `/workspace`
+
+By default, `PWNO_RUNTIME_ROOT` falls back to a temp directory similar to `/tmp/pwno`.
+
+## Common path-sensitive tools
+
+- `set_file`, `pwncli`, and `execute_python_script` resolve binary or script paths under `/workspace`
+- `run_command`, `spawn_process`, and `execute_python_code` resolve `cwd` under `/workspace`
+- `fetch_repo` defaults to cloning into `/workspace/<repo-name>` when `target_dir` is omitted
+
+<Tip>
+  If a tool says a path was not found, first confirm the host file is inside `./workspace`, then retry with the in-container form like `/workspace/<name>`.
+</Tip>

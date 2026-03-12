@@ -1,44 +1,91 @@
 ---
 title: "Architecture"
-description: "Project structure and key design decisions behind pwno-mcp."
+description: "Project structure and runtime design decisions behind pwno-mcp."
 ---
+
+`pwno-mcp` combines a FastMCP server, a session registry, debugger backends, and helper tool families into a single stateful runtime.
+
+## Main runtime surfaces
+
+<CardGroup cols={2}>
+  <Card title="HTTP transport" icon="server">
+    FastMCP endpoint served at `/mcp` with `/healthz` for simple health checks.
+  </Card>
+  <Card title="stdio transport" icon="terminal">
+    Local process-based MCP mode for clients that cannot use HTTP.
+  </Card>
+  <Card title="Attach sidecar" icon="plug">
+    Local FastAPI helper that wraps process-attach workflows on `/attach`.
+  </Card>
+  <Card title="Session registry" icon="layers-3">
+    Keeps separate GDB state, runtime directories, and optional driver metadata per session.
+  </Card>
+</CardGroup>
+
+## Tool families
+
+- debugger control in `pwnomcp/tools/debug.py`
+- inspection in `pwnomcp/tools/inspect.py`
+- process helpers in `pwnomcp/tools/processes.py`
+- managed Python helpers in `pwnomcp/tools/python_env.py`
+- interactive exploit-driver flows in `pwnomcp/tools/pwncli.py`
+- repo acquisition in `pwnomcp/tools/repos.py`
+- RetDec integration in `pwnomcp/tools/retdec.py`
 
 ## Project structure
 
-```text
-pwnomcp/
-├── __init__.py
-├── __main__.py
-├── server.py
-├── runtime.py
-├── services.py
-├── lifespan.py
-├── asgi.py
-├── http/
-│   ├── models.py
-│   └── attach.py
-├── state/
-│   ├── session.py
-│   └── registry.py
-└── tools/
-    ├── *.py
-    └── backends/
-```
+<Tree>
+  <Tree.Folder name="pwnomcp" defaultOpen>
+    <Tree.File name="__main__.py" />
+    <Tree.File name="server.py" />
+    <Tree.File name="runtime.py" />
+    <Tree.File name="services.py" />
+    <Tree.File name="lifespan.py" />
+    <Tree.File name="asgi.py" />
+    <Tree.File name="cli.py" />
+    <Tree.Folder name="http" defaultOpen>
+      <Tree.File name="attach.py" />
+      <Tree.File name="health.py" />
+      <Tree.File name="models.py" />
+    </Tree.Folder>
+    <Tree.Folder name="state" defaultOpen>
+      <Tree.File name="session.py" />
+      <Tree.File name="registry.py" />
+    </Tree.Folder>
+    <Tree.Folder name="tools" defaultOpen>
+      <Tree.File name="debug.py" />
+      <Tree.File name="inspect.py" />
+      <Tree.File name="processes.py" />
+      <Tree.File name="python_env.py" />
+      <Tree.File name="pwncli.py" />
+      <Tree.File name="repos.py" />
+      <Tree.File name="retdec.py" />
+      <Tree.Folder name="backends">
+        <Tree.File name="gdb.py" />
+        <Tree.File name="pwndbg.py" />
+        <Tree.File name="subproc.py" />
+        <Tree.File name="python.py" />
+        <Tree.File name="git.py" />
+        <Tree.File name="retdec.py" />
+      </Tree.Folder>
+    </Tree.Folder>
+  </Tree.Folder>
+</Tree>
 
-## Key ideas
-
-### Synchronous tool execution
-
-Each MCP tool invocation returns a complete result suitable for agent workflows, instead of relying on a continuously streaming UI.
+## Key design decisions
 
 ### Stateful sessions
 
-The server maintains session state for loaded binaries, breakpoints, command history, runtime directories, and related driver metadata.
+The runtime keeps debugger state alive across calls instead of treating every request as a stateless shell command.
 
 ### GDB/MI-native control
 
-`pwno-mcp` prefers MI commands such as `-file-exec-and-symbols`, `-break-insert`, `-exec-run`, and `-data-evaluate-expression` so results stay structured and easier for agents to consume reliably.
+Execution-control tools prefer MI commands because they are structured and more reliable for agents than parsing free-form terminal output.
 
-### Per-container isolation
+### Separation of concerns
 
-Each runtime instance keeps its own debugger state and `/workspace` mount, which makes the system fit containerized and remote workflows well.
+The router registers tools, while most implementation logic lives in dedicated backend or tool modules.
+
+### Container-oriented runtime
+
+The project assumes containerized execution with a mounted `/workspace` and explicit ptrace capabilities.

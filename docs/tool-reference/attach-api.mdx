@@ -1,0 +1,130 @@
+---
+title: "Attach API"
+description: "Reference for the local /attach helper API and the bundled Python client helper."
+---
+
+The attach sidecar API is a local FastAPI service started in HTTP mode. It provides a simple wrapper for process-attach workflows.
+
+<Info>
+  The attach sidecar is separate from the main MCP endpoint and is not started in stdio mode.
+</Info>
+
+## Default endpoint
+
+```text
+POST http://127.0.0.1:5501/attach
+```
+
+## Request body
+
+```json
+{
+  "pre": ["set pagination off"],
+  "pid": 31337,
+  "after": ["info threads"],
+  "where": "/workspace/chal",
+  "session_id": "chal-a"
+}
+```
+
+### Request fields
+
+<ParamField path="pid" type="number" required>
+  Target process id to attach to.
+</ParamField>
+
+<ParamField path="session_id" type="string" required>
+  Target debug session id. The session must already exist.
+</ParamField>
+
+<ParamField path="where" type="string">
+  Optional binary path to load before attach. Use a path that resolves under `/workspace`.
+</ParamField>
+
+<ParamField path="pre" type="string[]">
+  Optional GDB or pwndbg commands executed before the attach.
+</ParamField>
+
+<ParamField path="after" type="string[]">
+  Optional GDB or pwndbg commands executed after a successful attach.
+</ParamField>
+
+## Response shape
+
+```json
+{
+  "successful": true,
+  "attach": {
+    "command": "attach",
+    "success": true,
+    "state": "stopped",
+    "pid": 31337,
+    "session_id": "chal-a"
+  },
+  "result": {
+    "set-file": {
+      "success": true
+    },
+    "info threads": {
+      "success": true
+    }
+  }
+}
+```
+
+### Response fields
+
+<ResponseField name="successful" type="boolean" required>
+  Whether the overall attach request succeeded.
+</ResponseField>
+
+<ResponseField name="attach" type="object">
+  Structured summary of the attach attempt.
+
+  <Expandable title="properties">
+    <ResponseField name="command" type="string">
+      Command label associated with the attach action.
+    </ResponseField>
+    <ResponseField name="success" type="boolean">
+      Whether the attach itself succeeded.
+    </ResponseField>
+    <ResponseField name="state" type="string">
+      Current debugger or inferior state after the attach.
+    </ResponseField>
+    <ResponseField name="pid" type="number">
+      Attached process id.
+    </ResponseField>
+    <ResponseField name="session_id" type="string">
+      Debug session used for the request.
+    </ResponseField>
+    <ResponseField name="error" type="string">
+      Present when attach setup or attach execution fails.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="result" type="object" required>
+  Map of pre-commands, optional `set-file`, and post-commands to their individual command results.
+</ResponseField>
+
+## Python helper
+
+`pwnomcp.cli.attach()` wraps the same API.
+
+```python
+from pwnomcp.cli import attach
+
+response = attach(
+    pid=31337,
+    session_id="chal-a",
+    gdbscript=["set pagination off"],
+    artifact_path="/workspace/chal",
+)
+
+print(response.model_dump())
+```
+
+## When to use it
+
+- use the MCP `attach` tool for normal in-client workflows
+- use `/attach` or `pwnomcp.cli.attach()` when you already have a local Python helper or external integration that wants a small HTTP contract

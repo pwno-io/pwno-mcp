@@ -1,0 +1,55 @@
+---
+title: "Build and Helper Processes"
+description: "Use run_command, spawn_process, Python helpers, and repo fetching without colliding with debugger flows."
+---
+
+`pwno-mcp` includes automation tools for build steps and helper services, but they are intentionally separate from debugger control.
+
+<CardGroup cols={2}>
+  <Card title="run_command" icon="terminal">
+    Use for compiles, build scripts, and short-lived helper commands.
+  </Card>
+  <Card title="spawn_process" icon="server">
+    Use for long-running helper processes such as local HTTP servers or listeners.
+  </Card>
+  <Card title="execute_python_code" icon="file-code">
+    Use for quick Python probes instead of `python -c`.
+  </Card>
+  <Card title="fetch_repo" icon="folder">
+    Use for cloning helper repositories into `/workspace`.
+  </Card>
+</CardGroup>
+
+## Example flow
+
+<Steps>
+  <Step title="Build a target or helper binary">
+
+    ```json
+    {"tool":"run_command","arguments":{"command":"gcc -g vuln.c -o chal","cwd":"/workspace","timeout":30.0}}
+    ```
+  </Step>
+  <Step title="Start a background helper service">
+
+    ```json
+    {"tool":"spawn_process","arguments":{"command":"python3 -m http.server 8000","cwd":"/workspace"}}
+    ```
+  </Step>
+  <Step title="Inspect or stop the helper">
+
+    ```json
+    {"tool":"get_process","arguments":{"pid":12345}}
+    {"tool":"kill_process","arguments":{"pid":12345,"signal":15}}
+    ```
+  </Step>
+</Steps>
+
+## Guardrails
+
+- do not use `run_command` or `spawn_process` to start the target ELF you want to debug
+- do not use `python -c` inside `run_command`; use `execute_python_code` instead
+- use `pwncli` when you need interactive exploit-driver I/O instead of a generic subprocess
+
+<Warning>
+  The subprocess backend actively rejects some unsafe usage patterns and returns a `ToolUsageError`-style payload with a recommended tool when you pick the wrong interface.
+</Warning>

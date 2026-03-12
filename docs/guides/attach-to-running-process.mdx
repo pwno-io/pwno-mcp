@@ -1,0 +1,78 @@
+---
+title: "Attach to a Running Process"
+description: "Use the debugger attach tool or the attach sidecar API to join an existing process."
+---
+
+Use attach flows when the target is already running and you want `pwno-mcp` to join that process instead of starting it with `run`.
+
+## Option 1: MCP tool attach
+
+<Steps>
+  <Step title="Create a debug session">
+
+    ```json
+    {"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Optionally load the binary first">
+
+    ```json
+    {"tool":"set_file","arguments":{"binary_path":"/workspace/chal","session_id":"chal-a"}}
+    ```
+
+    This helps when symbol loading matters before the attach.
+  </Step>
+  <Step title="Attach to the PID">
+
+    ```json
+    {"tool":"attach","arguments":{"pid":31337,"session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Inspect the attached process">
+
+    ```json
+    {"tool":"get_context","arguments":{"context_type":"backtrace","session_id":"chal-a"}}
+    ```
+  </Step>
+</Steps>
+
+## Option 2: Attach sidecar API
+
+The local HTTP attach helper is useful for external scripts and wrappers. It is only started in HTTP mode.
+
+<CodeGroup>
+
+```json HTTP request
+{
+  "pre": ["set pagination off"],
+  "pid": 31337,
+  "after": ["info threads"],
+  "where": "/workspace/chal",
+  "session_id": "chal-a"
+}
+```
+
+```python Python helper
+from pwnomcp.cli import attach
+
+response = attach(
+    pid=31337,
+    session_id="chal-a",
+    gdbscript=["set pagination off"],
+    artifact_path="/workspace/chal",
+)
+print(response.model_dump())
+```
+
+</CodeGroup>
+
+<Warning>
+  Attach flows still require the same ptrace-related Docker capabilities as normal debugger control.
+</Warning>
+
+## When to use which path
+
+- use the MCP `attach` tool inside normal agent flows
+- use the attach sidecar API when you already have a local helper script or external integration that wants a simple HTTP entrypoint
+
+See [Attach API Reference](/tool-reference/attach-api) for the full request and response contract.

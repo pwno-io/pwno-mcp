@@ -3,13 +3,31 @@ title: "Troubleshooting"
 description: "Common pwno-mcp setup and runtime issues."
 ---
 
-## Common errors
+Start with the symptom that best matches what you are seeing.
 
-- `No binary loaded. Use set_file first.`: call `set_file` before `run`.
-- `binary_path` not found: use container-visible paths such as `/workspace/chal`.
-- Attach or ptrace failures: keep `SYS_PTRACE`, `SYS_ADMIN`, and unconfined seccomp and apparmor flags.
-- HTTP connection failures: make sure the container publishes `-p 5500:5500` and that the client URL is exactly `http://127.0.0.1:5500/mcp` unless you changed the path.
-- Health checks should point at `http://127.0.0.1:5500/healthz`.
+<AccordionGroup>
+  <Accordion title="I cannot connect to the HTTP server">
+    Confirm the container publishes `-p 5500:5500` and that the client URL is exactly `http://127.0.0.1:5500/mcp` unless you changed the defaults.
+  </Accordion>
+  <Accordion title="My health check fails">
+    Point health checks at `http://127.0.0.1:5500/healthz`. The attach sidecar is a separate service and is not the health endpoint.
+  </Accordion>
+  <Accordion title="I get ptrace or attach permission errors">
+    Keep `SYS_PTRACE`, `SYS_ADMIN`, and unconfined seccomp and apparmor settings on the container.
+  </Accordion>
+  <Accordion title="The server says the binary path was not found">
+    Use container-visible paths such as `/workspace/chal`, and make sure the host file exists inside the mounted `./workspace` directory.
+  </Accordion>
+  <Accordion title="The server says no binary is loaded">
+    Call `set_file` before `run`, or use `attach` when the process is already running.
+  </Accordion>
+  <Accordion title="A helper tool returned a string instead of an object">
+    Some helper families intentionally return JSON-formatted strings. See [Response Shapes](/concepts/response-shapes).
+  </Accordion>
+  <Accordion title="RetDec is unavailable">
+    Confirm `BINARY_URL` is set and points to a URL the external RetDec service can fetch.
+  </Accordion>
+</AccordionGroup>
 
 ## Fast checks
 
@@ -17,12 +35,10 @@ description: "Common pwno-mcp setup and runtime issues."
 2. Confirm your client points to the right transport.
 3. Confirm your binary exists under the mounted `workspace` directory.
 4. Confirm your tool calls use `/workspace/...` paths.
+5. Confirm you are using the correct `session_id`.
 
-## Docs preview
-
-To preview this Mintlify site locally:
+## Preview this Mintlify site locally
 
 ```bash
-cd docs
-npm run dev
+npm --prefix docs run dev
 ```

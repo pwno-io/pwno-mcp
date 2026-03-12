@@ -1,0 +1,79 @@
+---
+title: "Response Shapes"
+description: "Understand how pwno-mcp tools return structured data, JSON strings, and errors."
+---
+
+Not every `pwno-mcp` tool returns data in exactly the same shape. This matters when you are wiring the server into an agent or building wrappers around it.
+
+## Main response families
+
+| Tool family | Typical shape | Notes |
+| --- | --- | --- |
+| debugger and inspection tools | structured object | usually includes `success` and session-specific fields |
+| `pwncli` tools | structured object | includes session-aware I/O or event data |
+| process, Python, repo, and RetDec helpers | JSON-formatted string | parse the string if your client does not already coerce it |
+| `attach` debugger tool | two-part result | returns the attach result plus a context snapshot list |
+| attach sidecar API | structured object | response model has `successful`, `attach`, and `result` |
+
+## Structured object example
+
+Debugger tools such as `set_file`, `run`, `get_context`, and `set_breakpoint` return objects directly.
+
+```json
+{
+  "success": true,
+  "session_id": "chal-a"
+}
+```
+
+On failure they follow the common error envelope:
+
+```json
+{
+  "success": false,
+  "error": "Debug session 'chal-a' not found",
+  "type": "RuntimeError"
+}
+```
+
+## JSON-string helper example
+
+Automation helpers such as `run_command`, `spawn_process`, `execute_python_code`, `fetch_repo`, `get_retdec_status`, and `get_decompiled_code` return JSON strings.
+
+```json
+"{\n  \"success\": true,\n  \"returncode\": 0,\n  \"stdout\": \"...\"\n}"
+```
+
+<Warning>
+  If you are writing your own integration, do not assume every tool already returns a parsed object. Some helpers intentionally serialize their result with `json.dumps(..., indent=2)`.
+</Warning>
+
+## Attach-specific shapes
+
+There are two attach surfaces:
+
+- the MCP `attach` tool returns an attach result plus a list of context snapshots
+- the HTTP `/attach` helper API returns a single object with this shape:
+
+```json
+{
+  "successful": true,
+  "attach": {
+    "success": true,
+    "pid": 31337,
+    "session_id": "chal-a"
+  },
+  "result": {
+    "set-file": {
+      "success": true
+    }
+  }
+}
+```
+
+## Practical advice
+
+- Treat debugger and `pwncli` tools as object-returning tools.
+- Treat process, Python, repo, and RetDec tools as string-returning helpers unless your client parses them for you.
+- When handling failures, always look for `success`, `error`, and `type` before assuming a result shape.
+- When handling attach flows, account for the extra context data or the attach-sidecar wrapper object.

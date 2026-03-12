@@ -1,0 +1,35 @@
+---
+title: "Guides"
+description: "Task-oriented walkthroughs for common pwno-mcp workflows."
+---
+
+Use the guides when you want a working sequence, not just a tool description.
+
+<CardGroup cols={2}>
+  <Card title="First Debug Session" icon="bug" href="/guides/first-debug-session">
+    Create a session, load a binary, stop at `main`, and inspect state.
+  </Card>
+  <Card title="Attach to a Running Process" icon="plug" href="/guides/attach-to-running-process">
+    Join an existing PID with either the MCP attach tool or the local attach helper API.
+  </Card>
+  <Card title="Interactive Exploit Loop" icon="terminal" href="/guides/interactive-exploit-loop">
+    Start a `pwncli` driver, send input, read output, and collect events.
+  </Card>
+  <Card title="Multi-Session Workflows" icon="layers-3" href="/guides/multi-session-workflows">
+    Keep several debugger or exploit flows active without state collisions.
+  </Card>
+  <Card title="Build and Helper Processes" icon="server" href="/guides/build-and-helper-processes">
+    Use helper commands, background services, Python helpers, and repo fetches safely.
+  </Card>
+</CardGroup>
+
+## Recommended order
+
+1. Start with [First Debug Session](/guides/first-debug-session).
+2. Move to [Attach to a Running Process](/guides/attach-to-running-process) when the target is already alive.
+3. Use [Interactive Exploit Loop](/guides/interactive-exploit-loop) when you need session-scoped exploit I/O.
+4. Add [Multi-Session Workflows](/guides/multi-session-workflows) and [Build and Helper Processes](/guides/build-and-helper-processes) as your workflow gets more complex.
+
+<Info>
+  If you already know the workflow and just need exact tool arguments or return fields, jump to the [Reference](/tool-reference/index) section instead.
+</Info>

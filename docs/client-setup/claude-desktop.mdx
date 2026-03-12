@@ -10,7 +10,9 @@ Claude Desktop uses a local stdio MCP server definition.
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Linux: `~/.config/Claude/claude_desktop_config.json`
 
-Use an absolute host path for the workspace mount.
+<Warning>
+  Use an absolute host path for the workspace mount. Claude Desktop will not expand project-local placeholders such as `${workspaceFolder}` in this config.
+</Warning>
 
 ```json
 {
@@ -36,3 +38,7 @@ Use an absolute host path for the workspace mount.
   }
 }
 ```
+
+<Check>
+  Restart Claude Desktop after editing the config, then confirm `pwno-mcp` appears in the MCP server list.
+</Check>

@@ -1,37 +1,85 @@
 ---
-title: "pwno-mcp"
-description: "Stateful debugging for autonomous pwn and binary research over MCP."
+title: "Introduction"
+description: "Stateful debugging, exploit I/O, and workspace automation for autonomous pwn workflows over MCP."
 ---
 
-`pwno-mcp` runs GDB + pwndbg in an isolated environment and exposes stateful debugging and helper tooling over MCP for agentic coding clients.
+<img
+  className="block dark:hidden"
+  src="/images/banner-light.png"
+  alt="pwno-mcp banner"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/banner-dark.png"
+  alt="pwno-mcp banner"
+/>
+
+
+`pwno-mcp` runs GDB + pwndbg in an isolated environment and exposes session-aware debugging, exploit-driver I/O, and helper tooling over MCP for agentic clients.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Launch the server with Docker and connect your MCP client.
+  </Card>
+  <Card title="Choose a client" icon="plug" href="/client-setup/index">
+    Pick Claude, Cursor, OpenCode, or Codex CLI and copy a working config.
+  </Card>
+  <Card title="Guides" icon="bug" href="/guides/index">
+    Follow task-oriented walkthroughs for first-run debugging, attach flows, exploit I/O, and multi-session work.
+  </Card>
+  <Card title="Reference" icon="square-terminal" href="/tool-reference/index">
+    Jump straight to debugger, automation, and attach API details.
+  </Card>
+</CardGroup>
 
 ## Why it exists
 
 The project is built for LLM-driven binary research workflows where a stateless shell is not enough. It keeps debugger state alive across calls, supports multiple parallel sessions, and pairs low-level debugging with helper tools for process management, Python execution, repo fetching, and exploit-driver flows.
 
-## Highlights
+You can use `pwno-mcp` to participate in CTFs, research, and exploit development workflows.
 
-- Stateful GDB + pwndbg sessions exposed over MCP.
-- Deterministic execution control with GDB/MI commands.
-- Fast context snapshots for registers, stack, disassembly, source, and backtraces.
-- Optional `pwncli`-based interactive workflows tied to a debug session.
-- Build, subprocess, Git, Python, and RetDec helpers in the same runtime.
-- HTTP and stdio transports for local and remote MCP clients.
+## Typical workflow
 
-## Start here
+<Steps>
+  <Step title="Launch pwno-mcp">
+    Use the Docker flow in [Quick Start](/quickstart). Most users start with HTTP transport and the default `http://127.0.0.1:5500/mcp` endpoint.
+  </Step>
+  <Step title="Connect your client">
+    Pick a page under [Client Setup](/client-setup/index) and add the server using either HTTP or stdio.
+  </Step>
+  <Step title="Create a debug session">
+    Start with `create_debug_session`, then `set_file`, `set_breakpoint`, and `run`. The walkthrough in [First Debug Session](/guides/first-debug-session) shows the full sequence.
+  </Step>
+  <Step title="Automate deeper workflows">
+    Move on to [Guides](/guides/index) and the [Reference](/tool-reference/index) section when you need attach flows, exploit I/O, or workspace automation.
+  </Step>
+</Steps>
 
-1. Use [Quick Start](/quickstart) to launch the server with Docker.
-2. Pick a client setup page under the Client Setup section.
-3. Run the flow in [Verify Setup](/verify-setup) if you want an end-to-end sanity check.
-4. Dive into the [Tool Reference](/tool-reference/debug-sessions) when you are ready to automate.
+<Info>
+  Paths passed to tools should normally resolve inside `/workspace`. If you mount `./workspace` from your host into the container, a host file like `./workspace/chal` becomes `/workspace/chal` in tool calls.
+</Info>
 
 ## Runtime model
 
 - The default HTTP endpoint is `http://127.0.0.1:5500/mcp`.
 - The health endpoint is `http://127.0.0.1:5500/healthz`.
+- The local attach helper API runs on `http://127.0.0.1:5501/attach` in HTTP mode by default.
 - Most file paths passed to tools should resolve inside `/workspace`.
 - Multi-session workflows should pass explicit `session_id` values.
 
-## Documentation source
+## Supporting concepts
 
-This Mintlify site lives in `docs/` and is a structured version of the repository README. The GitHub `README.md` stays in place for package metadata and repository landing-page use.
+<CardGroup cols={2}>
+  <Card title="Need a transport and config" icon="plug" href="/concepts/transports-and-runtime">
+    Learn how HTTP, stdio, `/healthz`, and the attach sidecar fit together.
+  </Card>
+  <Card title="Need session semantics" icon="layers-3" href="/concepts/sessions">
+    Understand `session_id`, default session behavior, runtime directories, and isolation.
+  </Card>
+  <Card title="Need path rules" icon="folder" href="/concepts/workspace-paths">
+    See how host paths map into `/workspace` and when relative paths are rewritten.
+  </Card>
+  <Card title="Need tool outputs" icon="file-code" href="/concepts/response-shapes">
+    Review dict responses, JSON-string responses, and error envelopes before integrating with an agent.
+  </Card>
+</CardGroup>

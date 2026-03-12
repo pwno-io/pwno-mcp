@@ -1,0 +1,66 @@
+---
+title: "Transports and Runtime"
+description: "HTTP, stdio, health checks, attach sidecar behavior, and runtime defaults."
+---
+
+`pwno-mcp` supports two main runtime modes.
+
+<Tabs>
+  <Tab title="HTTP">
+    - Main MCP endpoint defaults to `http://127.0.0.1:5500/mcp`
+    - Health endpoint defaults to `http://127.0.0.1:5500/healthz`
+    - Local attach helper API defaults to `http://127.0.0.1:5501/attach`
+    - Best when your client wants a `url` or you want the server process to stay alive outside the client
+  </Tab>
+  <Tab title="stdio">
+    - The client launches `python -m pwnomcp --stdio` or the equivalent Docker command
+    - No HTTP endpoint is involved
+    - Best when your client expects a local `command` and `args`
+    - The attach sidecar is not started in stdio mode
+  </Tab>
+</Tabs>
+
+## CLI defaults
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--host` | `0.0.0.0` | main HTTP bind host |
+| `--port` | `5500` | main HTTP port |
+| `--attach-host` | `127.0.0.1` | attach API bind host |
+| `--attach-port` | `5501` | attach API port |
+| `--http-path` | `/mcp` | HTTP transport path |
+| `--stdio` | disabled | switches runtime into stdio mode |
+
+## Example launches
+
+<CodeGroup>
+
+```bash HTTP
+python -m pwnomcp
+```
+
+```bash Custom HTTP
+python -m pwnomcp --host 0.0.0.0 --port 6600 --http-path /mcp
+```
+
+```bash stdio
+python -m pwnomcp --stdio
+```
+
+</CodeGroup>
+
+## Runtime surfaces
+
+- `/mcp` is the main FastMCP transport path in HTTP mode
+- `/healthz` returns a simple JSON status payload for health checks
+- `/attach` is a helper API for process-attach workflows driven by the local Python helper or external automation
+
+<Info>
+  The attach API is separate from the main MCP transport. It exists to make some attach workflows simpler for local helper scripts and integrations.
+</Info>
+
+## Which mode should you use?
+
+- choose HTTP for persistent local servers, remote clients, and easy health checks
+- choose stdio for clients that only support local process-based MCP servers
+- keep the Docker capability and security flags the same in both modes

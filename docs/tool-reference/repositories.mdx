@@ -1,0 +1,25 @@
+---
+title: "Repositories"
+description: "Clone helper repositories into the workspace for analysis or build support."
+---
+
+`fetch_repo` clones a Git repository into `/workspace`.
+
+## Returned shape
+
+`fetch_repo` returns a JSON-formatted string.
+
+## Parameters
+
+- `repo_url`: HTTPS or SSH repository URL
+- `version`: optional branch, tag, or commit
+- `target_dir`: optional explicit destination inside `/workspace`
+- `shallow`: whether to use a shallow clone
+
+```json
+{"tool":"fetch_repo","arguments":{"repo_url":"https://github.com/pwno-io/pwno-mcp.git","version":"main","target_dir":"/workspace/pwno-mcp","shallow":true}}
+```
+
+<Tip>
+  If you omit `target_dir`, the server derives a directory name from the repository URL and clones into `/workspace/<repo-name>`.
+</Tip>

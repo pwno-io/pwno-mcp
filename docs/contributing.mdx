@@ -1,6 +1,6 @@
 ---
 title: "Contributing"
-description: "How to contribute to pwno-mcp."
+description: "How to contribute code or documentation to pwno-mcp."
 ---
 
 Contributions are welcome.
@@ -19,3 +19,9 @@ uv run black --check .
 uv run mypy pwnomcp --ignore-missing-imports --disable-error-code=import-untyped
 uv run pytest -v
 ```
+
+## Documentation expectations
+
+- keep Mintlify navigation in `docs/docs.json` aligned with new pages
+- use the existing product vocabulary: sessions, `/workspace`, HTTP vs stdio, and tool families
+- prefer short, workflow-oriented examples over long README-style narrative

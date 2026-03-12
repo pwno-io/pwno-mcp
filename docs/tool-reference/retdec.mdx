@@ -1,0 +1,30 @@
+---
+title: "RetDec"
+description: "Inspect optional RetDec decompilation status and retrieve decompiled code."
+---
+
+RetDec integration is lazy-initialized and driven by the `BINARY_URL` environment variable.
+
+## Returned shape
+
+Both tools on this page return JSON-formatted strings.
+
+## Available tools
+
+```json
+{"tool":"get_retdec_status","arguments":{}}
+{"tool":"get_decompiled_code","arguments":{}}
+```
+
+- `get_retdec_status` reports whether decompilation was skipped, failed, or succeeded
+- `get_decompiled_code` returns C output when available, otherwise an unavailable response with details
+
+## Runtime behavior
+
+- if `BINARY_URL` is missing, RetDec initialization is skipped
+- decompilation runs lazily on first access, not at import time
+- success responses include whether decompiled code is available
+
+<Warning>
+  RetDec depends on an external service. A missing `BINARY_URL`, HTTP failure, or timeout can all produce a non-success status.
+</Warning>

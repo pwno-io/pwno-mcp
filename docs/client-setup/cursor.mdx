@@ -10,9 +10,9 @@ Cursor MCP configuration can live in either of these files:
 
 If you use project config, keep your target binary under `PROJECT_ROOT/workspace/`.
 
-## HTTP example
+<CodeGroup>
 
-```json
+```json HTTP
 {
   "mcpServers": {
     "pwno-mcp": {
@@ -22,9 +22,7 @@ If you use project config, keep your target binary under `PROJECT_ROOT/workspace
 }
 ```
 
-## stdio example
-
-```json
+```json stdio
 {
   "mcpServers": {
     "pwno-mcp": {
@@ -49,3 +47,9 @@ If you use project config, keep your target binary under `PROJECT_ROOT/workspace
   }
 }
 ```
+
+</CodeGroup>
+
+<Check>
+  Open Cursor's MCP panel after saving the config and confirm the server is connected before starting debugger workflows.
+</Check>

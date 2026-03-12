@@ -1,0 +1,37 @@
+---
+title: "Multi-Session Workflows"
+description: "Run multiple debugger or exploit sessions in parallel without state collisions."
+---
+
+`pwno-mcp` is built for concurrent workflows. You can keep more than one binary, attach target, or exploit driver active by assigning stable `session_id` values.
+
+## Example pattern
+
+```json
+{"tool":"create_debug_session","arguments":{"session_id":"patched"}}
+{"tool":"create_debug_session","arguments":{"session_id":"original"}}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal-patched","session_id":"patched"}}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal","session_id":"original"}}
+{"tool":"set_breakpoint","arguments":{"location":"main","session_id":"patched"}}
+{"tool":"set_breakpoint","arguments":{"location":"main","session_id":"original"}}
+```
+
+## Good practices
+
+- use one session per target binary or scenario
+- keep session names semantic: `patched`, `remote`, `local`, `heap`, `rop`, `stage2`
+- pass `session_id` explicitly on every debugger and `pwncli` call
+- use `list_debug_sessions` and `list_pwncli_sessions` to keep track of what is still alive
+
+## Cleanup
+
+When you are done, close idle sessions so GDB processes and driver state are released.
+
+```json
+{"tool":"close_debug_session","arguments":{"session_id":"patched"}}
+{"tool":"close_debug_session","arguments":{"session_id":"original"}}
+```
+
+<Tip>
+  Named sessions are especially useful when several agent subtasks are running in parallel, because each thread can keep its own debugger state without reloading the binary.
+</Tip>

@@ -3,19 +3,30 @@ title: "Verify Setup"
 description: "Run a fast end-to-end check against a local pwno-mcp instance."
 ---
 
-Most users can skip this page, but it is useful when you are troubleshooting a fresh MCP connection.
+Most users can skip this page, but it is useful when you are validating a new client config or debugging a first-time setup issue.
 
-## Prompt to give your agent
+<Steps>
+  <Step title="Ask your agent to run a tiny debugger flow">
 
-```text
-Use pwno-mcp to load /workspace/chal, set a breakpoint at main, run the program, show full context, then step once.
+    ```text
+    Use pwno-mcp to create a debug session called chal-a, load /workspace/chal, set a breakpoint at main, run the program, show full context, then step once.
+    ```
+  </Step>
+  <Step title="Check the expected behavior">
+    You should see the session created, the binary loaded, execution stop at `main`, a full context snapshot returned, and one successful step.
+  </Step>
+  <Step title="Fall back to manual tool calls if needed">
+    If your agent cannot complete the flow, run the sequence below through any MCP inspector or compatible client.
+  </Step>
+</Steps>
+
+<CodeGroup>
+
+```text Agent prompt
+Use pwno-mcp to create a debug session called chal-a, load /workspace/chal, set a breakpoint at main, run the program, show full context, then step once.
 ```
 
-If you followed Quick Start, the host path is `./workspace/chal` and the in-container tool path is `/workspace/chal`.
-
-## Manual tool sequence
-
-```json
+```json Manual tool calls
 {"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
 {"tool":"set_file","arguments":{"binary_path":"/workspace/chal","session_id":"chal-a"}}
 {"tool":"set_breakpoint","arguments":{"location":"main","session_id":"chal-a"}}
@@ -24,4 +35,12 @@ If you followed Quick Start, the host path is `./workspace/chal` and the in-cont
 {"tool":"step_control","arguments":{"command":"n","session_id":"chal-a"}}
 ```
 
-Common stepping commands are `c`, `n`, `s`, `ni`, and `si`.
+</CodeGroup>
+
+If you followed [Quick Start](/quickstart), the host path is `./workspace/chal` and the in-container tool path is `/workspace/chal`.
+
+<Check>
+  Common stepping commands are `c`, `n`, `s`, `ni`, and `si`.
+</Check>
+
+If this flow fails, go straight to [Troubleshooting](/troubleshooting) or check the transport, session, and path rules in [Core Concepts](/concepts/transports-and-runtime).

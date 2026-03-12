@@ -1,0 +1,62 @@
+---
+title: "Docker and Compose"
+description: "Container launch patterns, local image builds, and compose usage for pwno-mcp."
+---
+
+`pwno-mcp` is designed for containerized usage first.
+
+<Warning>
+  Keep the ptrace-related capabilities and unconfined seccomp/apparmor flags unless you have already proven that your environment supports a stricter configuration.
+</Warning>
+
+## Run the published image
+
+<CodeGroup>
+
+```bash HTTP
+docker run --rm -p 5500:5500 \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  -v "$PWD/workspace:/workspace" \
+  ghcr.io/pwno-io/pwno-mcp:latest
+```
+
+```bash stdio
+docker run --rm -i \
+  --cap-add=SYS_PTRACE \
+  --cap-add=SYS_ADMIN \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  -v "$PWD/workspace:/workspace" \
+  ghcr.io/pwno-io/pwno-mcp:latest \
+  --stdio
+```
+
+</CodeGroup>
+
+## Build locally
+
+```bash
+docker build -t pwno-mcp:latest . --platform linux/amd64
+```
+
+The published image targets `linux/amd64`. On Apple Silicon, keep the explicit platform flag unless you have built your own compatible variant.
+
+## Docker Compose
+
+```bash
+docker-compose up -d
+docker-compose logs -f
+docker-compose exec pwno-mcp bash
+```
+
+The repository `docker-compose.yml` exposes port `5500`, mounts `./workspace` to `/workspace`, and applies the required debugger capabilities.
+
+## Published image tags
+
+- `latest`: stable default
+- `edge`: tracks the default branch
+- `sha-<short>`: pinned commit image
+- `X.Y.Z`, `X.Y`, `X`: release tags derived from version tags

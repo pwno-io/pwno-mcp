@@ -1,0 +1,44 @@
+---
+title: "Reference"
+description: "Tool-by-tool reference for debugger control, inspection, exploit I/O, and automation helpers."
+---
+
+Use the reference when you already know what you are trying to do and need the exact tool surface.
+
+## Debugger and inspection
+
+<CardGroup cols={2}>
+  <Card title="Debug Sessions" icon="bug" href="/tool-reference/debug-sessions">
+    Session lifecycle, file loading, breakpoints, attach flows, and execution control.
+  </Card>
+  <Card title="Inspection" icon="search" href="/tool-reference/inspection">
+    Context snapshots and memory reads without changing execution.
+  </Card>
+  <Card title="Attach API" icon="plug" href="/tool-reference/attach-api">
+    Local `/attach` helper API and the bundled Python helper.
+  </Card>
+</CardGroup>
+
+## Automation and exploit I/O
+
+<CardGroup cols={2}>
+  <Card title="pwncli Workflows" icon="terminal" href="/tool-reference/pwncli">
+    Session-scoped exploit-driver startup, I/O, events, and cleanup.
+  </Card>
+  <Card title="Processes" icon="server" href="/tool-reference/processes">
+    Helper commands and tracked background processes.
+  </Card>
+  <Card title="Python" icon="file-code" href="/tool-reference/python">
+    Managed Python execution and package management.
+  </Card>
+  <Card title="Repositories" icon="folder" href="/tool-reference/repositories">
+    Clone helper repos into `/workspace`.
+  </Card>
+  <Card title="RetDec" icon="braces" href="/tool-reference/retdec">
+    Inspect optional decompilation status and retrieve code when available.
+  </Card>
+</CardGroup>
+
+<Info>
+  If you need a full end-to-end sequence instead of a tool-by-tool breakdown, use the [Guides](/guides/index) section.
+</Info>

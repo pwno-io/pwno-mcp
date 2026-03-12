@@ -1,0 +1,35 @@
+---
+title: "Client Setup"
+description: "Pick an MCP client and copy a working pwno-mcp configuration."
+---
+
+All supported clients connect to the same `pwno-mcp` server. The only difference is whether they expect a remote HTTP endpoint or a local stdio command.
+
+<Info>
+  If your client asks for a `url`, use HTTP mode. If it asks for a `command` and `args`, use stdio mode.
+</Info>
+
+<CardGroup cols={2}>
+  <Card title="Claude Desktop" icon="plug" href="/client-setup/claude-desktop">
+    Local stdio config for the desktop app.
+  </Card>
+  <Card title="Claude Code" icon="terminal" href="/client-setup/claude-code">
+    Project-scoped HTTP or stdio setup from the CLI.
+  </Card>
+  <Card title="Cursor" icon="square-terminal" href="/client-setup/cursor">
+    Project or global MCP config using HTTP or stdio.
+  </Card>
+  <Card title="OpenCode" icon="code" href="/client-setup/opencode">
+    Remote or local MCP config for OpenCode.
+  </Card>
+  <Card title="Codex CLI" icon="file-code" href="/client-setup/codex-cli">
+    TOML-based MCP config for Codex CLI.
+  </Card>
+</CardGroup>
+
+## Shared rules across clients
+
+- Use `http://127.0.0.1:5500/mcp` for HTTP unless you changed the defaults.
+- Mount your host `./workspace` directory into `/workspace` inside the container.
+- Pass `/workspace/...` paths to tools, not host-only absolute paths.
+- Keep the Docker capability and security flags from [Quick Start](/quickstart) unchanged unless you know your environment supports a stricter setup.

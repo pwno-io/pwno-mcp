@@ -1,6 +1,6 @@
 ---
 title: "Development"
-description: "Local development, Docker build, and CI notes for maintainers."
+description: "Local development, verification commands, and docs preview for maintainers."
 ---
 
 This page is for working on `pwno-mcp` itself, not for debugging a target binary.
@@ -9,36 +9,39 @@ This page is for working on `pwno-mcp` itself, not for debugging a target binary
 
 Prerequisites on the host are Python 3.12+, GDB with Python support, and a working pwndbg setup.
 
-```bash
+<CodeGroup>
+
+```bash uv
 uv sync
 uv run python -m pwnomcp
 uv run python -m pwnomcp --stdio
+```
 
-# or without uv
+```bash pip
 python -m pip install -e ".[dev]"
 python -m pwnomcp
 python -m pwnomcp --stdio
 ```
 
-## Docker build
+</CodeGroup>
+
+## Verification commands
 
 ```bash
-docker build -t pwno-mcp:latest . --platform linux/amd64
+uv run black --check .
+uv run mypy pwnomcp --ignore-missing-imports --disable-error-code=import-untyped
+uv run pytest -v
 ```
 
-The published image targets `linux/amd64`. On Apple Silicon, keep the explicit platform flag.
-
-## Docker Compose
+## Docs preview
 
 ```bash
-docker-compose up -d
-docker-compose logs -f
-docker-compose exec pwno-mcp bash
+npm --prefix docs run dev
 ```
 
-## CI checks
+## CI snapshot
 
-Current GitHub Actions run these verification steps:
+Current GitHub Actions run these verification steps before build or publish:
 
 - `uv sync --locked --extra dev`
 - `uv run black --check .`

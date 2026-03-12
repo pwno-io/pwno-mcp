@@ -1,13 +1,13 @@
 ---
 title: "Inspection"
-description: "Read current debugger context and inspect memory."
+description: "Read current debugger context and inspect memory without changing execution."
 ---
 
-These tools read debugger state without changing execution.
+These tools read debugger state without changing the inferior's execution.
 
-## Context snapshots
+## `get_context`
 
-`get_context` returns either a full quick snapshot or one focused view.
+`get_context` returns either a broad quick snapshot or one focused view.
 
 Supported `context_type` values:
 
@@ -23,14 +23,25 @@ Supported `context_type` values:
 {"tool":"get_context","arguments":{"context_type":"backtrace","session_id":"chal-a"}}
 ```
 
-## Memory reads
+## `get_memory`
 
 `get_memory` accepts a start address expression, byte count, and output format.
 
-- Use expressions like `$rsp` or `0xdeadbeef`.
-- Use `format: "hex"` for raw bytes.
-- Use `format: "string"` for `x/s`-style output.
+<CodeGroup>
 
-```json
+```json Hex bytes
 {"tool":"get_memory","arguments":{"address":"$rsp","size":64,"format":"hex","session_id":"chal-a"}}
 ```
+
+```json String view
+{"tool":"get_memory","arguments":{"address":"$rdi","size":64,"format":"string","session_id":"chal-a"}}
+```
+
+</CodeGroup>
+
+## Address and format notes
+
+- use expressions like `$rsp`, `$rip`, or `0xdeadbeef`
+- use `format: "hex"` for raw bytes
+- use `format: "string"` for `x/s`-style string output
+- use a named session so repeated reads stay attached to the same debugger state

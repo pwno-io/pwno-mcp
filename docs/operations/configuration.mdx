@@ -1,0 +1,51 @@
+---
+title: "Configuration"
+description: "CLI flags, runtime defaults, and environment variables that affect pwno-mcp."
+---
+
+This page covers the main knobs exposed by `pwno-mcp` itself.
+
+## CLI flags
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--host` | `0.0.0.0` | bind host for the main HTTP server |
+| `--port` | `5500` | bind port for the main HTTP server |
+| `--attach-host` | `127.0.0.1` | bind host for the attach sidecar API |
+| `--attach-port` | `5501` | bind port for the attach sidecar API |
+| `--http-path` | `/mcp` | main HTTP transport path |
+| `--stdio` | off | run as a stdio MCP server instead of HTTP |
+
+## Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `PWNO_RUNTIME_ROOT` | override the root directory for session runtime data, process logs, and shared helper artifacts |
+| `BINARY_URL` | enables lazy RetDec analysis against an externally reachable binary URL |
+
+## Example launches
+
+<CodeGroup>
+
+```bash Default HTTP
+python -m pwnomcp
+```
+
+```bash Custom ports
+python -m pwnomcp --host 0.0.0.0 --port 6600 --attach-port 6601 --http-path /mcp
+```
+
+```bash stdio
+python -m pwnomcp --stdio
+```
+
+</CodeGroup>
+
+## Operational defaults
+
+- main HTTP endpoint: `http://127.0.0.1:5500/mcp`
+- health check: `http://127.0.0.1:5500/healthz`
+- attach sidecar: `http://127.0.0.1:5501/attach`
+- workspace root inside the runtime: `/workspace`
+
+Use [Docker and Compose](/operations/docker-and-compose) for launch recipes and [Troubleshooting](/troubleshooting) for common misconfigurations.

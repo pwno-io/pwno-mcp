@@ -1,0 +1,58 @@
+---
+title: "First Debug Session"
+description: "Create a session, load a binary, stop at main, inspect state, and step once."
+---
+
+This is the canonical first-run debugger workflow for `pwno-mcp`.
+
+<Steps>
+  <Step title="Create a named debug session">
+
+    ```json
+    {"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Load the target binary">
+
+    ```json
+    {"tool":"set_file","arguments":{"binary_path":"/workspace/chal","session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Set a breakpoint at main">
+
+    ```json
+    {"tool":"set_breakpoint","arguments":{"location":"main","session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Run the program">
+
+    ```json
+    {"tool":"run","arguments":{"args":"","start":false,"session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Inspect the current state">
+
+    ```json
+    {"tool":"get_context","arguments":{"context_type":"all","session_id":"chal-a"}}
+    {"tool":"get_memory","arguments":{"address":"$rsp","size":64,"format":"hex","session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Step once">
+
+    ```json
+    {"tool":"step_control","arguments":{"command":"n","session_id":"chal-a"}}
+    ```
+  </Step>
+</Steps>
+
+<Check>
+  At this point you should have a stable named session you can continue using for more breakpoints, raw `execute` commands, or an interactive `pwncli` flow.
+</Check>
+
+## Useful follow-ups
+
+- use `finish` to run out of the current function
+- use `until` to run until a location or next source line
+- use `gdb_interrupt` if the inferior is still running and you need to regain control
+
+See [Debug Sessions Reference](/tool-reference/debug-sessions) for the full command set.

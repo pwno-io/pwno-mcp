@@ -10,9 +10,9 @@ OpenCode supports remote HTTP MCP servers and local stdio commands.
 - Global: `~/.config/opencode/opencode.json`
 - Project-local: `opencode.json`
 
-## Remote HTTP example
+<CodeGroup>
 
-```json
+```json HTTP
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
@@ -25,9 +25,7 @@ OpenCode supports remote HTTP MCP servers and local stdio commands.
 }
 ```
 
-## Local stdio example
-
-```json
+```json stdio
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
@@ -55,7 +53,13 @@ OpenCode supports remote HTTP MCP servers and local stdio commands.
 }
 ```
 
+</CodeGroup>
+
 ## Helpful commands
 
 - `opencode mcp add`
 - `opencode mcp list`
+
+<Check>
+  After setup, run `opencode mcp list` and confirm `pwno-mcp` is enabled before opening your target project.
+</Check>

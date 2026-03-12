@@ -1,0 +1,79 @@
+---
+title: "Sessions"
+description: "Understand session_id, runtime directories, and how pwno-mcp keeps debugger state alive."
+---
+
+Every meaningful debugger workflow in `pwno-mcp` is scoped to a `session_id`.
+
+## What a session contains
+
+A debug session bundles together:
+
+- one GDB controller instance
+- one `SessionState` record for binary path, pid, state, and breakpoints
+- one session-specific `runtime_dir`
+- an optional `pwncli` driver PID tied to the same session
+
+<Info>
+  The server creates a default session at startup, but most real workflows should still use explicit session names so parallel tasks stay isolated and easy to reason about.
+</Info>
+
+## Lifecycle
+
+<Steps>
+  <Step title="Create or select a session">
+
+    ```json
+    {"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
+    ```
+
+    `create_debug_session` returns the existing session when that id already exists.
+  </Step>
+  <Step title="Run debugger tools inside that session">
+
+    ```json
+    {"tool":"set_file","arguments":{"binary_path":"/workspace/chal","session_id":"chal-a"}}
+    {"tool":"run","arguments":{"session_id":"chal-a"}}
+    ```
+  </Step>
+  <Step title="Inspect session metadata">
+
+    ```json
+    {"tool":"get_session_info","arguments":{"session_id":"chal-a"}}
+    {"tool":"list_debug_sessions","arguments":{}}
+    ```
+  </Step>
+  <Step title="Close the session when finished">
+
+    ```json
+    {"tool":"close_debug_session","arguments":{"session_id":"chal-a"}}
+    ```
+
+    Closing a session also stops any attached `pwncli` driver for that session.
+  </Step>
+</Steps>
+
+## Why explicit session IDs matter
+
+- They let you keep multiple binaries or exploit strategies active at the same time.
+- They prevent one agent thread from clobbering another thread's breakpoints or process state.
+- They give every session its own `runtime_dir`, which is where inline `pwncli` scripts are written.
+
+## Multi-session pattern
+
+```json
+{"tool":"create_debug_session","arguments":{"session_id":"chal-a"}}
+{"tool":"create_debug_session","arguments":{"session_id":"chal-b"}}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal-a","session_id":"chal-a"}}
+{"tool":"set_file","arguments":{"binary_path":"/workspace/chal-b","session_id":"chal-b"}}
+```
+
+<Tip>
+  Use short, stable names such as `chal-a`, `remote`, `patched`, or `heap-lab` instead of random ids. It makes agent planning and human debugging much easier.
+</Tip>
+
+## Related pages
+
+- [Workspace Paths](/concepts/workspace-paths)
+- [First Debug Session](/guides/first-debug-session)
+- [Debug Sessions Reference](/tool-reference/debug-sessions)

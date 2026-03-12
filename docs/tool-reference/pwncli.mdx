@@ -5,7 +5,7 @@ description: "Interactive exploit-driver flows tied to a debug session."
 
 Use the `pwncli` family when you want an interactive exploit driver that stays attached to a specific debug session.
 
-## Start a driver
+## `pwncli`
 
 `pwncli` writes the provided script into the session runtime directory, launches it with `uv run`, and exposes both startup output and any parsed attach result marker.
 
@@ -13,13 +13,18 @@ Use the `pwncli` family when you want an interactive exploit driver that stays a
 {"tool":"pwncli","arguments":{"session_id":"chal-a","binary_path":"/workspace/chal","file":"from pwn import *\nprint('ready')\n"}}
 ```
 
-## Interact with the driver
+### Important returned fields
 
-- `sendinput` writes raw input to the session driver.
-- `checkoutput` returns buffered output and clears that buffer.
-- `checkevents` returns structured events and driver liveness data.
+- `runtime_dir`: session-specific directory used for the inline script
+- `io.current_output`: output collected for this call
+- `attachment.result`: parsed attach result marker when present
+- `startup.ready`: whether the driver reached a ready state
+- `startup.reason`: why the wait finished
+- `startup.alive`: whether the driver is still alive
+- `startup.pid`: driver process id
+- `startup.replaced`: whether an older driver was replaced for this session
 
-`sendinput` does not append a newline automatically.
+## I/O tools
 
 ```json
 {"tool":"sendinput","arguments":{"session_id":"chal-a","data":"AAAA\n"}}
@@ -27,12 +32,26 @@ Use the `pwncli` family when you want an interactive exploit driver that stays a
 {"tool":"checkevents","arguments":{"session_id":"chal-a"}}
 ```
 
-## Stop or inspect sessions
+- `sendinput` writes raw bytes to stdin
+- `checkoutput` returns buffered output and clears it
+- `checkevents` returns structured events plus `alive`, `exit_code`, and `driver_pid`
 
-- `pwncli_stop` kills the driver bound to a session.
-- `list_pwncli_sessions` lists all active driver sessions.
+<Warning>
+  `sendinput` does not append a newline automatically.
+</Warning>
+
+## Session management tools
 
 ```json
 {"tool":"pwncli_stop","arguments":{"session_id":"chal-a"}}
 {"tool":"list_pwncli_sessions","arguments":{}}
 ```
+
+- `pwncli_stop` kills the driver bound to a session
+- `list_pwncli_sessions` lists all active drivers
+
+## Behavior notes
+
+- one `pwncli` driver per debug session
+- launching a new driver for the same session replaces the old one
+- `close_debug_session` also stops the session's active driver
