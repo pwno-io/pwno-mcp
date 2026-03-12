@@ -22,14 +22,14 @@
 
 ## Documentation
 
-The full documentation now lives at `https://docs.pwno.io`.
+The full documentation now lives at [docs.pwno.io](https://docs.pwno.io).
 
-- Docs home: `https://docs.pwno.io`
-- Quick start: `https://docs.pwno.io/quickstart`
-- Client setup: `https://docs.pwno.io/client-setup/index`
-- Guides: `https://docs.pwno.io/guides/index`
-- Reference: `https://docs.pwno.io/tool-reference/index`
-- Operations: `https://docs.pwno.io/operations/configuration`
+- Docs home: [docs.pwno.io](https://docs.pwno.io)
+- Quick start: [docs.pwno.io/quickstart](https://docs.pwno.io/quickstart)
+- Client setup: [docs.pwno.io/client-setup/index](https://docs.pwno.io/client-setup/index)
+- Guides: [docs.pwno.io/guides/index](https://docs.pwno.io/guides/index)
+- Reference: [docs.pwno.io/tool-reference/index](https://docs.pwno.io/tool-reference/index)
+- Operations: [docs.pwno.io/operations/configuration](https://docs.pwno.io/operations/configuration)
 
 Use the docs site for:
 
@@ -65,15 +65,15 @@ Default MCP endpoint:
 http://127.0.0.1:5500/mcp
 ```
 
-For stdio mode, client configs, health checks, and attach-helper details, use the docs site: `https://docs.pwno.io/quickstart`.
+For stdio mode, client configs, health checks, and attach-helper details, use the docs site: [docs.pwno.io/quickstart](https://docs.pwno.io/quickstart).
 
 ## Development
 
 For local development, architecture, and contributing guidance, see:
 
-- `https://docs.pwno.io/development`
-- `https://docs.pwno.io/architecture`
-- `https://docs.pwno.io/contributing`
+- [docs.pwno.io/development](https://docs.pwno.io/development)
+- [docs.pwno.io/architecture](https://docs.pwno.io/architecture)
+- [docs.pwno.io/contributing](https://docs.pwno.io/contributing)
 
 ## Usage
 
@@ -91,7 +91,7 @@ For local development, architecture, and contributing guidance, see:
 
 This project is licensed under CC BY-NC-ND 4.0.
 
-See `LICENSE` or `https://docs.pwno.io/license` for details.
+See `LICENSE` for details.
 
 ## Contributing
 
