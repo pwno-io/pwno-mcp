@@ -22,22 +22,7 @@
 
 ## Documentation
 
-The full documentation now lives at [docs.pwno.io](https://docs.pwno.io).
-
-- Docs home: [docs.pwno.io](https://docs.pwno.io)
-- Quick start: [docs.pwno.io/quickstart](https://docs.pwno.io/quickstart)
-- Client setup: [docs.pwno.io/client-setup/index](https://docs.pwno.io/client-setup/index)
-- Guides: [docs.pwno.io/guides/index](https://docs.pwno.io/guides/index)
-- Reference: [docs.pwno.io/tool-reference/index](https://docs.pwno.io/tool-reference/index)
-- Operations: [docs.pwno.io/operations/configuration](https://docs.pwno.io/operations/configuration)
-
-Use the docs site for:
-
-- Docker and stdio setup
-- client-specific MCP configuration
-- workflow guides like first debug session, attach flows, and `pwncli`
-- complete tool reference and response shapes
-- troubleshooting, architecture, and development notes
+The full documentation is available at [docs.pwno.io](https://docs.pwno.io).
 
 ## Quick Start
 
