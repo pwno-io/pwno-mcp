@@ -16,7 +16,7 @@
 	"icons": {
 		"library": "lucide"
 	},
-	"favicon": "/images/logo-light.svg",
+	"favicon": "/images/logo.png",
 	"navigation": {
 		"tabs": [
       {
@@ -102,7 +102,13 @@
 			{
 				"tab": "Maintainers",
 				"icon": "book-open",
-				"pages": ["development", "architecture", "license", "contributing"]
+				"pages": [
+					"development",
+					"architecture",
+					"background-story",
+					"license",
+					"contributing"
+				]
 			}
 		]
 	},
