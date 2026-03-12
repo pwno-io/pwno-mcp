@@ -7,7 +7,30 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      should_rebuild: ${{ steps.filter.outputs.non_docs }}
+    steps:
+      - name: Detect docs-only changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            non_docs:
+              - "**"
+              - "!docs/**"
+              - "!assets/**"
+              - "!**/*.md"
+              - "!**/*.mdx"
+              - "!LICENSE"
+              - "!LICENSE.*"
   python:
+    needs: changes
+    if: ${{ needs.changes.outputs.should_rebuild == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,6 +52,8 @@ jobs:
       - name: Run pytest
         run: uv run pytest -v
   build:
+    needs: changes
+    if: ${{ needs.changes.outputs.should_rebuild == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
