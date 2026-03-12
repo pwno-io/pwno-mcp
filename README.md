@@ -72,8 +72,6 @@ For stdio mode, client configs, health checks, and attach-helper details, use th
 For local development, architecture, and contributing guidance, see:
 
 - [docs.pwno.io/development](https://docs.pwno.io/development)
-- [docs.pwno.io/architecture](https://docs.pwno.io/architecture)
-- [docs.pwno.io/contributing](https://docs.pwno.io/contributing)
 
 ## Usage
 
